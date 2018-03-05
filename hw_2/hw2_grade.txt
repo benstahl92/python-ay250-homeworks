@@ -1,0 +1,35 @@
+Your score: 17/17
+
+Breakdown & Comments: 
+
+----------------------------------------
+Problem 1: 5/5
+----------------------------------------
+1/1: plot with caption
+4/4: analysis
+
+Also I bet they're showing nu*F_nu versus log(lambda) which
+is somewhat atypical (though better for this kind of plot)
+and they really ought to have indicated this.
+
+----------------------------------------
+Problem 2: 7/7
+----------------------------------------
+3/3: Recreated plot
+3/3: New dynamic interactions
+1/1: Analysis of changes
+
+Nice! A slider for 'n' would have been cool too
+
+Before publishing, reconsider your color scheme. 
+Red/green color-blindness is the most common form of 
+color-blindness and therefore using these colors in 
+conjunction should be avoided or approached carefully.
+
+----------------------------------------
+Problem 3: 5/5
+----------------------------------------
+5/5: Reproduced plot: title, twin_x, legend, limits, linestyles
+
+
+Graded by C. E. Harris
