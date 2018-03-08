@@ -1,0 +1,61 @@
+Your score: 21/24
+
+**** WELL DONE! ****
+https://www.youtube.com/watch?v=2F2i6EQsPZY
+
+I think your code for Problem 3 was the best in the class! 
+Unfortunately I was excited about this problem and wrote up the 
+solution myself, so I am not going to include yours in the solution set...
+but I am going to acknowledge you anyway, in case your classmates can
+profit from your wisdom, guidance, and general life insights.
+You're the best around!
+
+Breakdown & Comments: 
+
+----------------------------------------
+Coding Style: 3/4
+----------------------------------------
+0/1: git repo style
+1/1: code style
+1/1: notebook style
+1/1: code portability
+
+git --
+your commit messages aren't helpful; when something is wrong, describe
+(briefly; at least where it is wrong)
+
+----------------------------------------
+Problem 1: 6/6 
+----------------------------------------
+3/3: good attempt of each part
+3/3: successful execution of each part
+
+See solutions for a simpler way to do the sub-pixel offset.
+
+----------------------------------------
+Problem 2: 7/7
+----------------------------------------
+2/2: good attempt of parts 2 and 5
+5/5: successful completion of parts 1-5
+
+part 2 - technical/mathematical note:
+power spectrum (for finding the "smallest component") is [prop to] y**2
+
+
+----------------------------------------
+Problem 3: 2/2 
+----------------------------------------
+2/2: successful completion of year/lunar estimates
+
+----------------------------------------
+Problem 4: 3/5 
+----------------------------------------
+0/1: understanding what is going on in the plot for part 1
+1/1: good attempt of part 1
+2/3: successful completion of parts 1-3
+
+I don't see the point lead incorporated into your polling function
+so I think you're doing that part incorrectly, but your results are a bit
+off.
+
+Graded by C. E. Harris
