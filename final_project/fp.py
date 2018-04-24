@@ -34,17 +34,17 @@ def mysql_query(usr, pswd, db, query):
     return list(results)
 
 def main(query):
-	'''
+    '''
     Parameters
     ----------
-	query : valid MySQL query
+    query : valid MySQL query
 
     Returns
     -------
 
-	'''
+    '''
 
-	# execute query against database and retrieve results
+    # execute query against database and retrieve results
     print('\nExecuting query...')
     results = dbi.mysql_query(dbp.usr, dbp.pswd, dbp.db, query)
     print('{} results retrieved'.format(len(results)))
