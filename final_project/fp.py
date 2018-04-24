@@ -28,12 +28,12 @@ def mysql_query(usr, pswd, db, query):
     >>> len(result)
     6979
     >>> type(result)
-    list
+    <class 'list'>
     >>> type(result[0])
-    dict
+    <class 'dict'>
 
     >>> query2 = "SELECT ObjName FROM objects LIMIT 10;"
-    >>> result2 = mysql_query(dbp.usr, dbp.pswd, dbp.db, query)
+    >>> result2 = mysql_query(dbp.usr, dbp.pswd, dbp.db, query2)
     >>> len(result2)
     10
     >>> result2[1]['ObjName']
