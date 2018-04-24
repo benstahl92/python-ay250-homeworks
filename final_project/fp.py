@@ -20,6 +20,15 @@ def mysql_query(usr, pswd, db, query):
     Returns
     -------
     results : list of all retrieved results (each as a dictionary)
+
+    Doctests
+    --------
+    >>> query = ""SELECT t1.ObjName, t2.Filename, t2.Filepath, t1.Redshift_Gal, t1.Type, t2.SNID_Type, t1.TypeReference, t2.SNID_Subtype
+    ...: , t2.SNR, t2.UT_Date, t1.PeakDate, t1.DiscDate, t2.Public FROM objects as t1, spectra as t2 WHERE (t1.ObjID = t2.ObjID) AND (t2
+    ...: .UT_Date > 20090101) AND (t2.UT_Date < 20180101) AND (t2.Min < 4500) and (t2.Max > 7000) AND (t2.Spec_Type = 'Total Flux') AND
+    ...: (t1.TypeReference != 'NULL') AND (t2.Filename NOT LIKE '%gal%') AND (t1.DiscDate > DATE('2008-01-01'));""
+    >>> len(mysql_query(dbp.usr, dbp.pswd, dbp.db, query))
+    1483
     '''
 
     # connect to db
@@ -48,3 +57,7 @@ def main(query):
     print('\nExecuting query...')
     results = mysql_query(dbp.usr, dbp.pswd, dbp.db, query)
     print('{} results retrieved'.format(len(results)))
+
+if __name__ == "__main__":
+    import doctest
+    doctest.testmod()
