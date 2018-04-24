@@ -21,11 +21,23 @@ def mysql_query(usr, pswd, db, query):
     -------
     results : list of all retrieved results (each as a dictionary)
 
-    Doctests
+    Doctests/Examples
     --------
-    >>> query = "SELECT t1.ObjName FROM objects as t1, spectra as t2 WHERE (t1.ObjID = t2.ObjID) AND (t2.UT_Date > 20090101) AND (t2.UT_Date < 20180101) AND (t2.Min < 4500) and (t2.Max > 7000) AND(t1.TypeReference != 'NULL') AND (t2.Filename NOT LIKE '%gal%') AND (t1.DiscDate > DATE('2008-01-01'));"
-    >>> len(mysql_query(dbp.usr, dbp.pswd, dbp.db, query))
-    1483
+    >>> query = "SELECT t1.ObjName FROM objects as t1, spectra as t2 WHERE (t1.ObjID = t2.ObjID) AND (t2.UT_Date > 19850101) AND (t2.UT_Date < 20180101) AND (t2.Min < 4500) and (t2.Max > 7000) AND (t2.Filename NOT LIKE '%gal%');"
+    >>> result = mysql_query(dbp.usr, dbp.pswd, dbp.db, query)
+    >>> len(result)
+    6979
+    >>> type(result)
+    list
+    >>> type(result[0])
+    dict
+
+    >>> query2 = "SELECT ObjName FROM objects LIMIT 10;"
+    >>> result2 = mysql_query(dbp.usr, dbp.pswd, dbp.db, query)
+    >>> len(result2)
+    10
+    >>> result2[1]['ObjName']
+    SN 1954A
     '''
 
     # connect to db
