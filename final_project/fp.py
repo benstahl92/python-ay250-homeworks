@@ -46,5 +46,5 @@ def main(query):
 
     # execute query against database and retrieve results
     print('\nExecuting query...')
-    results = dbi.mysql_query(dbp.usr, dbp.pswd, dbp.db, query)
+    results = mysql_query(dbp.usr, dbp.pswd, dbp.db, query)
     print('{} results retrieved'.format(len(results)))
