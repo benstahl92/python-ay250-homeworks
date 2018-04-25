@@ -4,6 +4,7 @@ import pickle as pkl
 import pandas as pd
 import numpy as np
 from astropy.io import ascii
+from scipy.interpolate import UnivariateSpline
 from scipy.interpolate import CubicSpline
 from scipy.signal import medfilt
 
@@ -59,60 +60,6 @@ def mysql_query(usr, pswd, db, query):
     # return results
     return list(results)
 
-def sp_medfilt(spec, ksize = 15):
-    '''
-    wrapper around scipy medfilt function
-        applies a median filter (and returns) spectrum
-    '''
-
-    flux = medfilt(spec[:,1], ksize)
-    return np.array([spec[:,0], flux]).T
-
-def log_bin(spec, wav_min = 3100, wav_max = 9600, n_bins = 1024):
-    '''
-    bins (and returns) spectrum to logarithmic scale between wav_min and wav_max with n_bins points
-    '''
-
-    dl = np.log(wav_max / wav_min) / n_bins
-    n = np.arange(0.5, n_bins + 0.5)
-    wav = spec[:,0]
-    log_wav = wav_min * np.exp(n * dl)
-    spl = CubicSpline(wav, spec[:,1])
-    flux = spl(log_wav)
-    flux[np.logical_or(log_wav < wav.min(), log_wav > wav.max())] = 0
-    return np.array([log_wav, flux]).T
-
-def cont_subtr(spec, n_spline_pts = 13):
-    '''
-    fits a cubic spline to a subset of points in the spectrum and subtracts it out to remove a pseudo continuum
-    '''
-
-    wav = spec[:,0]
-    loc = int(len(wav)/(2*n_spline_pts))
-    spl = CubicSpline(wav[loc:-loc:2*loc], spec[loc:-loc:2*loc,1])
-    flux = spec[:,1] - spl(wav)
-    return np.array([wav, flux]).T
-
-def apodize(spec, end_pct = 0.05):
-    '''
-    tapers the edges of the spectrum using a hanning window
-    '''
-
-    size = int(end_pct * spec.shape[0])
-    h = np.hanning(2 * size)
-    window = np.concatenate((h[:size], np.ones(spec.shape[0] - 2 * size), h[-size:]))
-    flux = spec[:,1] * window
-    return np.array([spec[:,0], flux]).T
-
-def flux_norm(spec):
-    '''
-    normalizes the flux (f) according to the algorithm: (f - f_min) / (f_max - f_min)
-    '''
-
-    f = spec[:,1]
-    nflux = (f - f.min()) / (f.max() - f.min())
-    return np.array([spec[:,0], nflux]).T
-
 class Spectrum:
     '''
     base class for each spectrum to be analyzed that provides a self-contained pathway from metadata to processed spectra
@@ -134,7 +81,6 @@ class Spectrum:
         self.z = redshift
         self.SNR = SNR
         self.spec = self.read_file()
-        self.spec_flag = 'raw'
 
     def read_file(self):
         '''
@@ -154,6 +100,65 @@ class Spectrum:
         wav = spec[:,0] / (1 + self.z)
         return np.array([wav, spec[:,1]]).T
 
+    def sp_medfilt(spec, ksize = 15):
+        '''
+        wrapper around scipy medfilt function
+            applies a median filter (and returns) spectrum
+        '''
+
+        flux = medfilt(spec[:,1], ksize)
+        return np.array([spec[:,0], flux]).T
+
+    def log_bin(spec, wav_min = 3100, wav_max = 9600, n_bins = 1024):
+        '''
+        bins (and returns) spectrum to logarithmic scale between wav_min and wav_max with n_bins points
+        '''
+
+        dl = np.log(wav_max / wav_min) / n_bins
+        n = np.arange(0.5, n_bins + 0.5)
+        wav = spec[:,0]
+        log_wav = wav_min * np.exp(n * dl)
+        spl = CubicSpline(wav, spec[:,1])
+        flux = spl(log_wav)
+        flux[np.logical_or(log_wav < wav.min(), log_wav > wav.max())] = 0
+        return np.array([log_wav, flux]).T
+
+    def cont_subtr(spec, n_spline_pts = 13, ret_cont = False):
+        '''
+        fits a cubic spline to a subset of points in the spectrum and subtracts it out to remove a pseudo continuum
+        '''
+
+        wav = spec[:,0]
+        #loc = int(len(wav)/(2*n_spline_pts))
+        spl_indices = np.linspace(0, spec.shape[0] - 1, n_spline_pts, dtype=int)
+        #spl = CubicSpline(wav[loc:-loc:2*loc], spec[loc:-loc:2*loc,1])
+        spl = UnivariateSpline(spec[spl_indices,0], spec[spl_indices,1])
+        flux = spec[:,1] - spl(wav)
+        if ret_cont is True:
+            return np.array([wav, flux]).T, spl
+        else:
+            return np.array([wav, flux]).T
+
+    def apodize(spec, end_pct = 0.05):
+        '''
+        tapers the edges of the spectrum using a hanning window
+        '''
+
+        size = int(end_pct * spec.shape[0])
+        h = np.hanning(2 * size)
+        window = np.concatenate((h[:size], np.ones(spec.shape[0] - 2 * size), h[-size:]))
+        flux = spec[:,1] * window
+        return np.array([spec[:,0], flux]).T
+
+    def flux_norm(spec):
+        '''
+        normalizes the flux (f) according to the algorithm: (f - f_min) / (f_max - f_min) - mean(qty on left)
+        '''
+
+        f = spec[:,1]
+        nflux = (f - f.min()) / (f.max() - f.min())
+        return np.array([spec[:,0], nflux - nflux.mean()]).T
+
     def preprocess(self, ksize = 15, n_spline_pts = 13, wav_min = 3100, wav_max = 9600, n_bins = 1024):
         '''
         perform preprocessing procedure on spectrum and return a 2d array of (column-wise) wavelength, flux
@@ -165,17 +170,17 @@ class Spectrum:
         # do median filtering
         spec = sp_medfilt(spec, ksize = ksize)
 
-        # bin to logarithmic wavelength bins
-        spec = log_bin(spec, wav_min = wav_min, wav_max = wav_max, n_bins = n_bins)
-
         # remove pseudo continuum
         spec = cont_subtr(spec, n_spline_pts = n_spline_pts)
+
+        # normalize
+        spec = flux_norm(spec)
 
         # apodize spectrum
         spec = apodize(spec)
 
-        # normalize
-        spec = flux_norm(spec)
+        # bin to logarithmic wavelength bins
+        spec = log_bin(spec, wav_min = wav_min, wav_max = wav_max, n_bins = n_bins)
 
         return spec
 
