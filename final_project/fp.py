@@ -636,6 +636,11 @@ def main(query = None, n_bins = 1024, n_regions = 16, tet = (0.8, 0.2), norm = T
             pkl.dump(results, f)
         print('done --- results written to {}'.format(query_res_fl))
 
+    # display summary statistics of sample
+    df = pd.DataFrame(results)
+    print('\nDistribution of types in selected sample:')
+    print(df['SNID_Subtype'].value_counts().sort_index())
+
     ######################################### data preprocessing #########################################
 
     # if no query has been passed and processed file exists, read from that
