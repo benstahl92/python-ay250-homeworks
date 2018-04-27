@@ -452,10 +452,7 @@ class ML_prep:
         self.X = self.featurize(n_regions = n_regions)
         self.y = self.proc_labels()
 
-        # randomized indices that reflect oversampling
-        self.osi = ML_prep.os_balance(self.y)
-
-        # X scaler fitted to training data
+        # X scaler to be fitted to training data
         self.X_scaler = StandardScaler()
 
         np.random.seed(rs)
@@ -550,14 +547,14 @@ class ML_prep:
                 raise ValueError('label {} has max count ({}) greater than label with calculated max count ({})'.format(
                                   uniques[idx], counts[idx], mc))
 
-        # shuffle and return oversample indices
-        return np.random.choice(osi, size = len(osi), replace = False)
+        # return (un-shuffled) oversample indices
+        return osi
 
-    def train_test_val_split(self, tet = (0.6, 0.2, 0.2)):
+    def train_test_val_split(self, tet = (0.6, 0.2, 0.2), os_train = True):
         '''
-        splits featurized data and labels into training, testing(, validation) sets and fits (but does not apply) normalization to test set
+        splits featurized data and labels into shuffled training, testing(, validation) sets and fits (but does not apply) normalization to test set
             normalization gets stored in self.X_scaler
-            note that osi is assumed to be shuffled already (as done by os_balance)
+            training data are oversampled to uniformity but testing(, validation) sets are not (if os_train is True, otherwise nothing done)
 
         Parameters
         ----------
@@ -571,16 +568,26 @@ class ML_prep:
 
         assert np.sum(tet) == 1
 
-        osi = self.osi
-        osil = len(osi)
-        X_train = self.X[osi[:int(tet[0]*osil)],:]
+        # get indices to shuffle data
+        dlen = len(self.y)
+        shuff_ind = np.random.choice(np.arange(dlen, dtype = int), size = dlen, replace = False)
+
+        # construct training data (with oversampling if requested)
+        y_train = self.y[shuff_ind[:int(tet[0]*dlen)]]
+        if os_train:
+            train_ind = ML_prep.os_balance(y_train)
+            X_train = self.X[train_ind]
+            y_train = self.y[train_ind]
+        elif not os_train:
+            X_train = self.X[suff_ind[:int(tet[0]*dlen)],:]
         self.X_scaler.fit(X_train)
-        y_train = self.y[osi[:int(tet[0]*osil)]]
-        X_test = self.X[osi[int(tet[0]*osil):int((tet[0]+tet[1])*osil)],:]
-        y_test = self.y[osi[int(tet[0]*osil):int((tet[0]+tet[1])*osil)]]
+
+        # construct testing(, validation) sets
+        X_test = self.X[shuff_ind[int(tet[0]*dlen):int((tet[0]+tet[1])*dlen)],:]
+        y_test = self.y[shuff_ind[int(tet[0]*dlen):int((tet[0]+tet[1])*dlen)]]
         if len(tet) == 3:
-            X_val = self.X[osi[-int(tet[2]*osil):],:]
-            y_val = self.y[osi[-int(tet[2]*osil):]]
+            X_val = self.X[shuf_ind[-int(tet[2]*dlen):],:]
+            y_val = self.y[shuf_ind[-int(tet[2]*dlen):]]
             return X_train, y_train, X_test, y_test, X_val, y_val
         elif len(tet) == 2:
             return X_train, y_train, X_test, y_test
