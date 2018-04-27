@@ -630,10 +630,10 @@ def main(query = None, n_bins = 1024, n_regions = 16, tet = (0.8, 0.2), norm = T
 
     # load, preprocess, and store all spectra and labels from results
     print('\nloading and preprocessing {} spectra and labels...'.format(len(results)))
-    pr_spectra = np.zeros((len(results, n_bins)))
+    pr_spectra = np.zeros((len(results), n_bins))
     labels = np.zeros(len(results))
     for idx, row in enumerate(tqdm(results)):
-        s = Spectrum(row['ObjName'], row['SNID_subtype'], base_dir + row['Filepath'] + '/' + row['Filename'], row['Redshift_Gal'])
+        s = Spectrum(row['ObjName'], row['SNID_Subtype'], base_dir + row['Filepath'] + '/' + row['Filename'], row['Redshift_Gal'])
         pr_spectra[idx, :] = s.preprocess(n_bins = n_bins)
         labels[idx] = s.type
     np.savez(proc_fl, pr_spectra, labels)
@@ -676,6 +676,12 @@ def main(query = None, n_bins = 1024, n_regions = 16, tet = (0.8, 0.2), norm = T
     with open(best_mod_fl, 'wb') as f:
         pkl.dump(best_mod, f)
     print('\nbest model written to file: {}'.format(best_mod_fl))
+
+"""
+example query
+
+SELECT t1.ObjName, t2.Filename, t2.Filepath, t1.Redshift_Gal, t2.SNID_Subtype FROM objects as t1, spectra as t2 WHERE (t1.ObjID = t2.ObjID) AND (t1.Redshift_Gal != 'NULL') AND (t2.SNID_Subtype LIKE 'Ia%') AND (t2.UT_Date > 20090101) AND (t2.UT_Date < 20180101) AND (t2.Min < 4500) and (t2.Max > 7000) AND (t2.Filename NOT LIKE '%gal%') AND (t1.DiscDate > DATE('2008-01-01'));
+"""
 
 # do tests
 #if __name__ == "__main__":
