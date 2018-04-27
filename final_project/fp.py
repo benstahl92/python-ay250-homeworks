@@ -15,6 +15,7 @@ from sklearn.dummy import DummyClassifier
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.model_selection import GridSearchCV
 from sklearn.model_selection import KFold
+from sklearn.metrics import accuracy_score
 
 # login credentials of MySQL database
 import db_params as dbp
@@ -536,7 +537,7 @@ class ML_prep:
         osi = np.zeros(mc * len(uniques), dtype = int)
 
         # iterate through labels, oversampling to match the label with the max count
-        li = np.arange(len(labels)) # label index array
+        li = np.arange(len(labels), dtype = int) # label index array
         for idx, cnt in enumerate(counts):
             if cnt == mc:
                 osi[(idx * mc):((idx + 1) * mc)] = li[labels == uniques[idx]]
@@ -547,8 +548,8 @@ class ML_prep:
                 raise ValueError('label {} has max count ({}) greater than label with calculated max count ({})'.format(
                                   uniques[idx], counts[idx], mc))
 
-        # return (un-shuffled) oversample indices
-        return osi
+        # return (shuffled) oversample indices
+        return np.random.choice(osi, size = len(osi), replace = False)
 
     def train_test_val_split(self, tet = (0.6, 0.2, 0.2), os_train = True):
         '''
@@ -573,11 +574,13 @@ class ML_prep:
         shuff_ind = np.random.choice(np.arange(dlen, dtype = int), size = dlen, replace = False)
 
         # construct training data (with oversampling if requested)
+        X_train = self.X[shuff_ind[:int(tet[0]*dlen)],:]
         y_train = self.y[shuff_ind[:int(tet[0]*dlen)]]
         if os_train:
             train_ind = ML_prep.os_balance(y_train)
-            X_train = self.X[train_ind]
-            y_train = self.y[train_ind]
+            X_train = X_train[train_ind]
+            y_train = y_train[train_ind]
+            c, u = np.unique(y_train, return_counts=True)
         elif not os_train:
             X_train = self.X[suff_ind[:int(tet[0]*dlen)],:]
         self.X_scaler.fit(X_train)
@@ -613,7 +616,7 @@ def main(query = None, n_bins = 1024, n_regions = 16, tet = (0.8, 0.2), norm = T
     feat_fl = 'feat.npz'
     best_mod_fl = 'best_mod.pkl'
 
-    print('Welcome to the Supernova Type Classifier Builder!\n')
+    print('\nWelcome to the Supernova Type Classifier Builder!\n')
 
     ######################################### data acquisition #########################################
 
@@ -635,18 +638,24 @@ def main(query = None, n_bins = 1024, n_regions = 16, tet = (0.8, 0.2), norm = T
 
     ######################################### data preprocessing #########################################
 
-    # could add skip for the below if the file exists...
+    # if no query has been passed and processed file exists, read from that
+    if (query is None) and os.path.isfile(proc_fl):
+        print('\nreading preprocessed spectra and labels from file...')
+        data = np.load(proc_fl)
+        pr_spectra = data['arr_0']
+        labels = data['arr_1']
 
-    # load, preprocess, and store all spectra and labels from results
-    print('\nloading and preprocessing {} spectra and labels...'.format(len(results)))
-    pr_spectra = np.zeros((len(results), n_bins))
-    labels = np.zeros(len(results), dtype=object)
-    for idx, row in enumerate(tqdm(results)):
-        s = Spectrum(row['ObjName'], row['SNID_Subtype'], base_dir + row['Filepath'] + '/' + row['Filename'], row['Redshift_Gal'])
-        pr_spectra[idx, :] = s.preprocess(n_bins = n_bins)[:,1]
-        labels[idx] = s.type
-    np.savez(proc_fl, pr_spectra, labels)
-    print('done --- results written to {}'.format(proc_fl))
+    # otherwise, load, preprocess, and store all spectra and labels from results
+    else:
+        print('\nloading and preprocessing {} spectra and labels...'.format(len(results)))
+        pr_spectra = np.zeros((len(results), n_bins))
+        labels = np.zeros(len(results), dtype=object)
+        for idx, row in enumerate(tqdm(results)):
+            s = Spectrum(row['ObjName'], row['SNID_Subtype'], base_dir + row['Filepath'] + '/' + row['Filename'], row['Redshift_Gal'])
+            pr_spectra[idx, :] = s.preprocess(n_bins = n_bins)[:,1]
+            labels[idx] = s.type
+        np.savez(proc_fl, pr_spectra, labels)
+        print('done --- results written to {}'.format(proc_fl))
 
     ######################################### machine learning #########################################
 
@@ -661,13 +670,13 @@ def main(query = None, n_bins = 1024, n_regions = 16, tet = (0.8, 0.2), norm = T
         X_train = mlp.X_scaler.transform(X_train)
         X_test = mlp.X_scaler.transform(X_test)
 
-    # compute baseline accuracy (due to oversampling, expect this to be close to 1/(number of classes))
+    # compute baseline accuracy (assuming 'Ia-norm' is the most frequent)
     print('\ncomputing baseline accuracy for {} classes'.format(len(np.unique(y_train))))
-    dc = DummyClassifier(strategy = 'prior')
+    dc = DummyClassifier(strategy = 'constant', constant = 'Ia-norm')
     dc.fit(X_train, y_train)
     baseline = dc.score(X_test, y_test)
     print('baseline accuracy: {:.3f}'.format(baseline))
-
+    
     # do a grid search with a k nearest neighbors algorithm and k fold cross-validation to identify the best hyper parameters
     est = KNeighborsClassifier()
     cv = KFold(n_splits = 6, random_state = rs)
