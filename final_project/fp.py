@@ -3,6 +3,7 @@ import pymysql as sql
 import pickle as pkl
 import pandas as pd
 import numpy as np
+import os
 from astropy.io import ascii
 from scipy.interpolate import UnivariateSpline
 from scipy.interpolate import CubicSpline
