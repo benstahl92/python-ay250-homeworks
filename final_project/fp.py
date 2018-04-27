@@ -456,7 +456,7 @@ class ML_prep:
         self.osi = ML_prep.os_balance(self.y)
 
         # X scaler fitted to training data
-        self.X_scaler = StandardScaler
+        self.X_scaler = StandardScaler()
 
         np.random.seed(rs)
 
@@ -536,7 +536,7 @@ class ML_prep:
         mc = counts[mci]
 
         # create array to hold oversample indices
-        osi = np.zeros(mc * len(uniques))
+        osi = np.zeros(mc * len(uniques), dtype = int)
 
         # iterate through labels, oversampling to match the label with the max count
         li = np.arange(len(labels)) # label index array
@@ -571,15 +571,16 @@ class ML_prep:
 
         assert np.sum(tet) == 1
 
+        osi = self.osi
         osil = len(osi)
-        X_train = self.X[:int(tet[0]*osil),:]
+        X_train = self.X[osi[:int(tet[0]*osil)],:]
         self.X_scaler.fit(X_train)
-        y_train = self.y[:int(tet[0]*osil)]
-        X_test = self.X[int(tet[0]*osil):int((tet[0]+tet[1])*osil),:]
-        y_test = self.y[int(tet[0]*osil):int((tet[0]+tet[1])*osil)]
+        y_train = self.y[osi[:int(tet[0]*osil)]]
+        X_test = self.X[osi[int(tet[0]*osil):int((tet[0]+tet[1])*osil)],:]
+        y_test = self.y[osi[int(tet[0]*osil):int((tet[0]+tet[1])*osil)]]
         if len(tet) == 3:
-            X_val = self.X[-int(tet[2]*osil):,:]
-            y_val = self.y[-int(tet[2]*osil):]
+            X_val = self.X[osi[-int(tet[2]*osil):],:]
+            y_val = self.y[osi[-int(tet[2]*osil):]]
             return X_train, y_train, X_test, y_test, X_val, y_val
         elif len(tet) == 2:
             return X_train, y_train, X_test, y_test
@@ -601,8 +602,8 @@ def main(query = None, n_bins = 1024, n_regions = 16, tet = (0.8, 0.2), norm = T
     # global filenames for storage
     query_res_fl = 'query_results.pkl'
     query_fl = 'query.txt'
-    proc_fl = 'proc.npy'
-    feat_fl = 'feat.npy'
+    proc_fl = 'proc.npz'
+    feat_fl = 'feat.npz'
     best_mod_fl = 'best_mod.pkl'
 
     print('Welcome to the Supernova Type Classifier Builder!\n')
@@ -632,10 +633,10 @@ def main(query = None, n_bins = 1024, n_regions = 16, tet = (0.8, 0.2), norm = T
     # load, preprocess, and store all spectra and labels from results
     print('\nloading and preprocessing {} spectra and labels...'.format(len(results)))
     pr_spectra = np.zeros((len(results), n_bins))
-    labels = np.zeros(len(results))
+    labels = np.zeros(len(results), dtype=object)
     for idx, row in enumerate(tqdm(results)):
         s = Spectrum(row['ObjName'], row['SNID_Subtype'], base_dir + row['Filepath'] + '/' + row['Filename'], row['Redshift_Gal'])
-        pr_spectra[idx, :] = s.preprocess(n_bins = n_bins)
+        pr_spectra[idx, :] = s.preprocess(n_bins = n_bins)[:,1]
         labels[idx] = s.type
     np.savez(proc_fl, pr_spectra, labels)
     print('done --- results written to {}'.format(proc_fl))
@@ -644,11 +645,10 @@ def main(query = None, n_bins = 1024, n_regions = 16, tet = (0.8, 0.2), norm = T
 
     # extract features and split into test, evaluation, and training sets
     print('\nfeaturizing data and extracting training, validation, and testing sets with oversampling...')
-    mlp = ML_prep(spectra, labels, n_regions = n_regions)
+    mlp = ML_prep(pr_spectra, labels, n_regions = n_regions)
     X_train, y_train, X_test, y_test = mlp.train_test_val_split(tet = tet)
     np.savez(feat_fl, X_train, y_train, X_test, y_test)
     print('done --- results written to {}'.format(feat_fl))
-
     # normalize based on training data (optionally)
     if norm:
         X_train = mlp.X_scaler.transform(X_train)
@@ -659,18 +659,19 @@ def main(query = None, n_bins = 1024, n_regions = 16, tet = (0.8, 0.2), norm = T
     dc = DummyClassifier(strategy = 'prior')
     dc.fit(X_train, y_train)
     baseline = dc.score(X_test, y_test)
-    print('baseline accuracy: {:.2f}'.format(baseline))
+    print('baseline accuracy: {:.3f}'.format(baseline))
 
     # do a grid search with a k nearest neighbors algorithm and k fold cross-validation to identify the best hyper parameters
-    est = KNeighborsClassifier(n_jobs = -1)
+    est = KNeighborsClassifier()
     cv = KFold(n_splits = 6, random_state = rs)
     param_grid = {'n_neighbors': [3, 5, 10, 15], 'weights': ['uniform', 'distance'], 'leaf_size': [20, 30, 40]}
-    print('commencing grid search over the following parameter grid:')
+    print('\ncommencing grid search over the following parameter grid:')
     print(param_grid)
     gs = GridSearchCV(est, param_grid, n_jobs = -1, cv = cv)
-    print('done --- best parameters (score: {:.2f}):'.format(gs.best_score_))
-    print('gs.best_params_')
-    print('accuracy: {:.2f}'.format(gs.score(X_test, y_test)))
+    gs.fit(X_train, y_train)
+    print('done --- best parameters (score: {:.3f}):'.format(gs.best_score_))
+    print(gs.best_params_)
+    print('accuracy: {:.3f}'.format(gs.score(X_test, y_test)))
 
     # save best model, X_scaler, and baseline for future reference
     best_mod = {'model': gs.best_estimator_, 'X_scaler': mlp.X_scaler, 'baseline': baseline}
