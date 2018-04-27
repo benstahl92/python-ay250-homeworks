@@ -7,9 +7,16 @@ from astropy.io import ascii
 from scipy.interpolate import UnivariateSpline
 from scipy.interpolate import CubicSpline
 from scipy.signal import medfilt
+from scipy.integrate import simps
+from tqdm import tqdm
+from sklearn.preprocessing import StandardScaler
+from sklearn.dummy import DummyClassifier
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.model_selection import GridSearchCV
+from sklearn.model_selection import KFold
 
 # login credentials of MySQL database
-#import db_params as dbp
+import db_params as dbp
 
 
 
@@ -30,7 +37,7 @@ def mysql_query(usr, pswd, db, query):
 
     Doctests/Examples
     -----------------
-    # NB: these tests will fail unless usr, pswd, and db are the valid credentials for my research group's database
+    # NB: these tests will fail unless usr, pswd, and db are the valid credentials for my research group's database (supplied by the import, but must be run on the appropriate computer)
     >>> query = "SELECT t1.ObjName FROM objects as t1, spectra as t2 WHERE (t1.ObjID = t2.ObjID) AND (t2.UT_Date > 19850101) AND (t2.UT_Date < 20180101) AND (t2.Min < 4500) and (t2.Max > 7000) AND (t2.Filename NOT LIKE '%gal%');"
     >>> result = mysql_query(dbp.usr, dbp.pswd, dbp.db, query)
     >>> len(result)
@@ -87,9 +94,18 @@ class Spectrum:
     flux_norm : normalizes flux (f) according to the algorithm: (f - f_min) / (f_max - f_min) - mean(qty on left)
     '''
 
-    def __init__(self, sn_name, sn_subtype, spec_filename, redshift, SNR, spec = None):
+    def __init__(self, sn_name, sn_subtype, spec_filename, redshift, spec = None):
         '''
         instantiation instructions
+
+        Parameters
+        ----------
+        (object instance)
+        sn_name : name of supernova
+        sn_subtype : subtype of supernova (i.e. Ia-norm)
+        spec_filename : filename (with relative path) of SN spectrum (file should have two columns: wavelength flux)
+        redshift : redshift of SN
+        spec (optional, 2d array) : 2d array of (column-wise) wavelength, flux
 
         Doctests/Examples
         -----------------
@@ -109,14 +125,11 @@ class Spectrum:
         self.type = sn_subtype
         self.file = spec_filename
         self.z = redshift
-        self.SNR = SNR # signal to noise ratio
 
         # attempt to make sure spec is in correct format, and read in otherwise
         if type(spec) != np.ndarray:
-            #self.spec = self.read_file()
             self.spec = Spectrum.read_file(spec_filename)
         elif spec.shape[1] != 2:
-            #self.spec = self.read_file()
             self.spec = Spectrum.read_file(spec_filename)
         else:
             self.spec = spec
@@ -383,7 +396,196 @@ class Spectrum:
 
         return spec
 
-def main(query = None, query_res_fl = 'query_results.pkl'):
+class ML_prep:
+    '''
+    base class for organizing and preparing data for machine learning processes
+        class contains methods for direct use by class instances and functions that can be exposed outside of a specific instance
+        for examples/doctests see docstrings for the methods and functions of the class
+
+    General Concepts
+    ----------------
+    takes spectra that have been preprocessed by the Spectrum class and prepares them for ingestion by a ML model
+    features are the integrated areas of different regions of each spectrum
+
+    Methods
+    -------
+    __init__ : instantiation instructions
+    featurize : featurizes spectra for ingestion by ML models
+    proc_labels : do any needed processing on labels before ingestion by ML model (currently trivial)
+    train_val_test_split : splits featurized data and labels into training, evaluation, and testing sets
+
+    Functions
+    ---------
+    integ_reg_area : breaks each spectrum into n_regions and calculates (and returns) the integrated area of each region
+    os_balance : makes number of occurrences of each label (and associated features) the same by oversampling
+    '''
+
+    def __init__(self, spectra, labels, n_regions = 16, rs = 100):
+        '''
+        instantiation instructions
+
+        Parameters
+        ----------
+        (object instance)
+        spectra : 2d array where each row corresponds to the flux of a given spectrum
+        labels : array of subtypes corresponding to the SNe in the rows of spectra
+        n_regions (optional, int) : number of regions to break each spectrum into for integrating
+                                    (NB: dividing this into n_bins from the Spectrum class should result in an integer)
+        rs : random state
+
+        Doctests/Examples
+        -----------------
+        >>> s = Spectrum('SN 1997y', 'Ia-norm', 'sn1997y-19970209-uohp.flm', 0.01587, 44.2219)
+        >>> mlp = ML_prep(s.preprocess()[:,1].reshape(1,-1), np.array([s.type]), n_regions = 16)
+        >>> len(mlp.osi) >= len(mlp.labels)
+        True
+        >>> mlp.X.shape
+        (1, 16)
+        '''
+
+        # full (un-prepared) sets
+        self.spectra = spectra
+        self.labels = labels
+
+        # full (featurized but not oversampled) sets
+        self.X = self.featurize(n_regions = n_regions)
+        self.y = self.proc_labels()
+
+        # randomized indices that reflect oversampling
+        self.osi = ML_prep.os_balance(self.y)
+
+        # X scaler fitted to training data
+        self.X_scaler = StandardScaler
+
+        np.random.seed(rs)
+
+    def integ_reg_area(spectra, n_regions = 16):
+        '''
+        breaks each spectrum into n_regions and calculates (and returns) the integrated area of each region
+
+        Parameters
+        ----------
+        spectra : 2d array where each row corresponds to the flux of a given spectrum
+        n_regions (optional, int) : number of regions to break each spectrum into for integrating
+                                    (NB: dividing this into n_bins from the Spectrum class should result in an integer)
+
+        Returns
+        -------
+        2d array where each row corresponds to the integrated area of each region of a given spectrum
+        '''
+
+        # split spectra into n_regions then integrate each of those regions
+        regions = np.split(spectra, n_regions, axis = 1)
+        return simps(regions, axis = 2).T
+
+    def featurize(self, n_regions = 16):
+        '''
+        featurizes spectra for ingestion by ML models
+            features are integrated areas of regions of each spectrum
+
+        Parameters
+        ----------
+        (object instance)
+        n_regions (optional, int) : number of regions to break each spectrum into for integrating
+                                    (NB: dividing this into n_bins from the Spectrum class should result in an integer)
+
+        Returns
+        -------
+        features : 2d array where each row corresponds features of a given spectrum
+        '''
+
+        # create container for features and then populate
+        features = np.zeros((self.spectra.shape[0], n_regions))
+        features[:, :n_regions] = ML_prep.integ_reg_area(self.spectra, n_regions = n_regions)
+        return features
+
+    def proc_labels(self):
+        '''
+        do any needed processing on labels before ingestion by ML model (currently trivial)
+
+        Parameters
+        ----------
+        (object instance)
+
+        Returns
+        -------
+        unmodified labels (trivial, but in the future only this function would need to be modified to adjust this)
+        '''
+
+        return self.labels
+
+    def os_balance(labels):
+        '''
+        makes number of occurrences of each label (and associated features) the same by oversampling
+
+        Parameters
+        ----------
+        labels : array of subtypes corresponding to the SNe in the rows of spectra
+
+        Returns
+        -------
+        osi : (shuffled) array of indices corresponding to labels that have been oversampled to match the most common label
+        '''
+
+        # get unique labels and their counts
+        uniques, counts = np.unique(labels, return_counts = True)
+
+        # get index of max count and max count
+        mci = np.argmax(counts)
+        mc = counts[mci]
+
+        # create array to hold oversample indices
+        osi = np.zeros(mc * len(uniques))
+
+        # iterate through labels, oversampling to match the label with the max count
+        li = np.arange(len(labels)) # label index array
+        for idx, cnt in enumerate(counts):
+            if cnt == mc:
+                osi[(idx * mc):((idx + 1) * mc)] = li[labels == uniques[idx]]
+            elif cnt < mc:
+                sample_indices = li[labels == uniques[idx]]
+                osi[(idx * mc):((idx + 1) * mc)] = np.random.choice(sample_indices, size = mc) # with replacement
+            elif cnt > mc:
+                raise ValueError('label {} has max count ({}) greater than label with calculated max count ({})'.format(
+                                  uniques[idx], counts[idx], mc))
+
+        # shuffle and return oversample indices
+        return np.random.choice(osi, size = len(osi), replace = False)
+
+    def train_test_val_split(self, tet = (0.6, 0.2, 0.2)):
+        '''
+        splits featurized data and labels into training, testing(, validation) sets and fits (but does not apply) normalization to test set
+            normalization gets stored in self.X_scaler
+            note that osi is assumed to be shuffled already (as done by os_balance)
+
+        Parameters
+        ----------
+        (object instance)
+        tet (optional, tuple) : 2 (or 3) element tuple containing the proportions to select for training, testing(, validation) 
+
+        Returns
+        -------
+        splitting : list of length 4 (or 6) containing the splits of training, testing(, validation) data (each split is X, y)
+        '''
+
+        assert np.sum(tet) == 1
+
+        osil = len(osi)
+        X_train = self.X[:int(tet[0]*osil),:]
+        self.X_scaler.fit(X_train)
+        y_train = self.y[:int(tet[0]*osil)]
+        X_test = self.X[int(tet[0]*osil):int((tet[0]+tet[1])*osil),:]
+        y_test = self.y[int(tet[0]*osil):int((tet[0]+tet[1])*osil)]
+        if len(tet) == 3:
+            X_val = self.X[-int(tet[2]*osil):,:]
+            y_val = self.y[-int(tet[2]*osil):]
+            return X_train, y_train, X_test, y_test, X_val, y_val
+        elif len(tet) == 2:
+            return X_train, y_train, X_test, y_test
+        else:
+            raise ValueError('tet is not length 2 or 3')
+
+def main(query = None, n_bins = 1024, n_regions = 16, tet = (0.8, 0.2), norm = True, base_dir = dbp.base_dir, rs = 100):
     '''
     Parameters
     ----------
@@ -395,27 +597,85 @@ def main(query = None, query_res_fl = 'query_results.pkl'):
 
     '''
 
-    ###################### data acquisition ######################
+    # global filenames for storage
+    query_res_fl = 'query_results.pkl'
+    query_fl = 'query.txt'
+    proc_fl = 'proc.npy'
+    feat_fl = 'feat.npy'
+    best_mod_fl = 'best_mod.pkl'
+
+    print('Welcome to the Supernova Type Classifier Builder!\n')
+
+    ######################################### data acquisition #########################################
 
     # if no query has been passed and a results file exists, read from that
     if (query is None) and os.path.isfile(query_res_fl):
+        print('reading from query results file...')
         with open(query_res_fl, 'rb') as f:
             results = pkl.load(f)
 
     # otherwise, execute query against database, retrieve results, and write to disk for later use
     else:
+        print('querying database...')
         results = mysql_query(dbp.usr, dbp.pswd, dbp.db, query)
-        with open('query.txt', 'w') as f:
+        with open(query_fl, 'w') as f:
             f.write(query)
         with open(query_res_fl, 'wb') as f:
             pkl.dump(results, f)
+        print('done --- results written to {}'.format(query_res_fl))
 
+    ######################################### data preprocessing #########################################
 
+    # could add skip for the below if the file exists...
 
+    # load, preprocess, and store all spectra and labels from results
+    print('\nloading and preprocessing {} spectra and labels...'.format(len(results)))
+    pr_spectra = np.zeros((len(results, n_bins)))
+    labels = np.zeros(len(results))
+    for idx, row in enumerate(tqdm(results)):
+        s = Spectrum(row['ObjName'], row['SNID_subtype'], base_dir + row['Filepath'] + '/' + row['Filename'], row['Redshift_Gal'])
+        pr_spectra[idx, :] = s.preprocess(n_bins = n_bins)
+        labels[idx] = s.type
+    np.savez(proc_fl, pr_spectra, labels)
+    print('done --- results written to {}'.format(proc_fl))
 
+    ######################################### machine learning #########################################
 
+    # extract features and split into test, evaluation, and training sets
+    print('\nfeaturizing data and extracting training, validation, and testing sets with oversampling...')
+    mlp = ML_prep(spectra, labels, n_regions = n_regions)
+    X_train, y_train, X_test, y_test = mlp.train_test_val_split(tet = tet)
+    np.savez(feat_fl, X_train, y_train, X_test, y_test)
+    print('done --- results written to {}'.format(feat_fl))
 
+    # normalize based on training data (optionally)
+    if norm:
+        X_train = mlp.X_scaler.transform(X_train)
+        X_test = mlp.X_scaler.transform(X_test)
 
+    # compute baseline accuracy (due to oversampling, expect this to be close to 1/(number of classes))
+    print('\ncomputing baseline accuracy for {} classes'.format(len(np.unique(y_train))))
+    dc = DummyClassifier(strategy = 'prior')
+    dc.fit(X_train, y_train)
+    baseline = dc.score(X_test, y_test)
+    print('baseline accuracy: {:.2f}'.format(baseline))
+
+    # do a grid search with a k nearest neighbors algorithm and k fold cross-validation to identify the best hyper parameters
+    est = KNeighborsClassifier(n_jobs = -1)
+    cv = KFold(n_splits = 6, random_state = rs)
+    param_grid = {'n_neighbors': [3, 5, 10, 15], 'weights': ['uniform', 'distance'], 'leaf_size': [20, 30, 40]}
+    print('commencing grid search over the following parameter grid:')
+    print(param_grid)
+    gs = GridSearchCV(est, param_grid, n_jobs = -1, cv = cv)
+    print('done --- best parameters (score: {:.2f}):'.format(gs.best_score_))
+    print('gs.best_params_')
+    print('accuracy: {:.2f}'.format(gs.score(X_test, y_test)))
+
+    # save best model, X_scaler, and baseline for future reference
+    best_mod = {'model': gs.best_estimator_, 'X_scaler': mlp.X_scaler, 'baseline': baseline}
+    with open(best_mod_fl, 'wb') as f:
+        pkl.dump(best_mod, f)
+    print('\nbest model written to file: {}'.format(best_mod_fl))
 
 # do tests
 #if __name__ == "__main__":
