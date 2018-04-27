@@ -15,7 +15,6 @@ import os
 from tqdm import tqdm
 
 # machine learning imports
-from sklearn.preprocessing import StandardScaler
 from sklearn.dummy import DummyClassifier
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.model_selection import GridSearchCV

@@ -1,5 +1,6 @@
 # imports
 import numpy as np
+from sklearn.preprocessing import StandardScaler
 from scipy.integrate import simps
 
 class ML_prep:
