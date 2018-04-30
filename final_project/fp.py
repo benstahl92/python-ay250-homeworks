@@ -1,12 +1,10 @@
 # imports
 
-# sql interaction
-#import pymysql as sql
-
 # basics
 import pickle as pkl
 import pandas as pd
 import numpy as np
+from astropy.io import ascii
 
 # system interaction
 import os
@@ -30,7 +28,7 @@ from SNDB import Spectra, Objects
 # login credentials of MySQL database
 import db_params as dbp
 
-def main(query = None, n_bins = 1024, n_regions = 16, tet = (0.8, 0.2), norm = True, base_dir = dbp.base_dir, rs = 100):
+def main(query = None, n_min = 50, n_bins = 1024, n_regions = 16, tet = (0.8, 0.2), norm = True, base_dir = dbp.base_dir, rs = 100):
     '''
     Parameters
     ----------
@@ -63,17 +61,11 @@ def main(query = None, n_bins = 1024, n_regions = 16, tet = (0.8, 0.2), norm = T
     else:
         print('querying database...')
         results = query.all()
-        #results = mysql_query(dbp.usr, dbp.pswd, dbp.db, query)
         with open(query_fl, 'w') as f:
-            f.write(query)
+            f.write(str(query))
         with open(query_res_fl, 'wb') as f:
             pkl.dump(results, f)
         print('done --- results written to {}'.format(query_res_fl))
-
-    # display summary statistics of sample
-    df = pd.DataFrame(results)
-    print('\nDistribution of types in selected sample:')
-    print(df['SNID_Subtype'].value_counts().sort_index())
 
     ######################################### data preprocessing #########################################
 
@@ -89,15 +81,40 @@ def main(query = None, n_bins = 1024, n_regions = 16, tet = (0.8, 0.2), norm = T
         print('\nloading and preprocessing {} spectra and labels...'.format(len(results)))
         pr_spectra = np.zeros((len(results), n_bins))
         labels = np.zeros(len(results), dtype=object)
+        keep_ind = [] # to hold indices where process succeeds
         for idx, row in enumerate(tqdm(results)):
             st = row.Spectra
             ot = row.Objects
-            s = Spectrum(ot.ObjName, st.SNID_subtype, base_dir + st.Filepath + '/' + st.Filename, ot.Redshift_Gal)
-            #s = Spectrum(row['ObjName'], row['SNID_Subtype'], base_dir + row['Filepath'] + '/' + row['Filename'], row['Redshift_Gal'])
-            pr_spectra[idx, :] = s.preprocess(n_bins = n_bins)[:,1]
-            labels[idx] = s.type
+            try:
+                s = Spectrum(ot.ObjName, st.SNID_Subtype, base_dir + st.Filepath + '/' + st.Filename, ot.Redshift_Gal)
+            except ascii.InconsistentTableError:
+                pass
+            try:
+                pr_spectra[idx, :] = s.preprocess(n_bins = n_bins)[:,1]
+                labels[idx] = s.type
+                keep_ind.append(idx)
+            except ValueError:
+                pass
+        pr_spectra = pr_spectra[keep_ind, :]
+        labels = labels[keep_ind]
         np.savez(proc_fl, pr_spectra, labels)
         print('done --- results written to {}'.format(proc_fl))
+
+    # display summary statistics of sample
+    s = pd.Series(labels)
+    print('\ndistribution of types in selected sample:')
+    print(s.value_counts().sort_index())
+
+    # optionally remove classes with few than n_min examples
+    if n_min is not None:
+        uniqs, cnts = np.unique(labels, return_counts = True)
+        to_remove = uniqs[cnts < n_min]
+        if len(to_remove) > 0:
+            print('\nremoving classes with fewer than {} occurences'.format(n_min))
+            for rem in to_remove:
+                rem_indices = np.where(labels == rem)
+                pr_spectra = np.delete(pr_spectra, rem_indices, 0)
+                labels = np.delete(labels, rem_indices, 0)
 
     ######################################### machine learning #########################################
 
@@ -143,5 +160,6 @@ if __name__ == "__main__":
 
     s = SNDB.get_session(dbp.usr, dbp.pswd, dbp.host, dbp.db)
     query = s.query(Spectra, Objects).filter(Spectra.ObjID == Objects.ObjID).filter(Objects.Redshift_Gal >= 0).filter(
-        Spectra.SNID_Subtype != 'NULL').filter(Spectra.Min < 4500).filter(Spectra.Max > 7000).filter(~Spectra.SNID_Subtype.like('%,%')).limit(10)
-    main(query = query)
+          Spectra.SNID_Subtype != 'NULL').filter(Spectra.Min < 4500).filter(Spectra.Max > 7000).filter(
+          ~Spectra.SNID_Subtype.like('%,%')).filter(Spectra.SNID_Subtype.like('I%'))
+    main()
