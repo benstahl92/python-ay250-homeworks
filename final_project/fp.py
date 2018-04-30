@@ -41,10 +41,10 @@ def main(query = None, n_min = 50, n_bins = 1024, n_regions = 16, tet = (0.8, 0.
     '''
 
     # global filenames for storage
-    query_res_fl = 'query_results.pkl'
-    query_fl = 'query.txt'
-    proc_fl = 'proc.npz'
-    feat_fl = 'feat.npz'
+    query_res_fl = 'checkpoints/query_results.pkl'
+    query_fl = 'checkpoints/query.txt'
+    proc_fl = 'checkpoints/proc.npz'
+    feat_fl = 'checkpoints/feat.npz'
     best_mod_fl = 'best_mod.pkl'
 
     print('\nWelcome to the Supernova Type Classifier Builder!\n')
@@ -162,4 +162,4 @@ if __name__ == "__main__":
     query = s.query(Spectra, Objects).filter(Spectra.ObjID == Objects.ObjID).filter(Objects.Redshift_Gal >= 0).filter(
           Spectra.SNID_Subtype != 'NULL').filter(Spectra.Min < 4500).filter(Spectra.Max > 7000).filter(
           ~Spectra.SNID_Subtype.like('%,%')).filter(Spectra.SNID_Subtype.like('I%'))
-    main()
+    main(query = query)
