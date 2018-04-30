@@ -204,10 +204,36 @@ class ML_prep:
         ----------
         (object instance)
         tet (optional, tuple) : 2 (or 3) element tuple containing the proportions to select for training, testing(, validation) 
+        os_train (optional, bool) : bool that selects whether training data should be over sampled until class proportions are equal
 
         Returns
         -------
         splitting : list of length 4 (or 6) containing the splits of training, testing(, validation) data (each split is X, y)
+
+        >>> data = np.load('test_files/proc_test.npz')
+        >>> mlp = ML_prep(data['arr_0'], data['arr_1'], n_regions = 16)
+        >>> X_train, y_train, X_test, y_test = mlp.train_test_val_split(tet = (0.625, 0.375))
+        >>> X_train.shape
+        (10, 32)
+        >>> X_test.shape
+        (6, 32)
+        >>> len(y_train)
+        10
+        >>> len(y_test)
+        6
+        >>> X_train, y_train, X_test, y_test, X_val, y_val = mlp.train_test_val_split(tet = (0.625, 0.250, 0.125))
+        >>> X_train.shape
+        (10, 32)
+        >>> X_test.shape
+        (4, 32)
+        >>> X_val.shape
+        (2, 32)
+        >>> len(y_train)
+        10
+        >>> len(y_test)
+        4
+        >>> len(y_val)
+        2
         '''
 
         assert np.sum(tet) == 1
