@@ -1,7 +1,7 @@
 # imports
 
 # sql interaction
-import pymysql as sql
+#import pymysql as sql
 
 # basics
 import pickle as pkl
@@ -24,57 +24,11 @@ from sklearn.metrics import accuracy_score
 # custom classes and functions
 from Spectrum import Spectrum
 from ML_prep import ML_prep
+import SNDB
+from SNDB import Spectra, Objects
 
 # login credentials of MySQL database
 import db_params as dbp
-
-def mysql_query(usr, pswd, db, query):
-    '''
-    execute a mysql query on a given database and return the result as a list containing all retrieved rows as dictionaries
-
-    Parameters
-    ----------
-    usr : user name for database access (typically accessed from a param file, see example)
-    pswd : password for given user name (typically accessed from a param file, see example)
-    db : database name (typically accessed from a param file, see example)
-    query : valid MySQL query
-
-    Returns
-    -------
-    results : list of all retrieved results (each as a dictionary)
-
-    Doctests/Examples
-    -----------------
-    # NB: these tests will fail unless usr, pswd, and db are the valid credentials for my research group's database (supplied by the import, but must be run on the appropriate computer)
-    >>> query = "SELECT t1.ObjName FROM objects as t1, spectra as t2 WHERE (t1.ObjID = t2.ObjID) AND (t2.UT_Date > 19850101) AND (t2.UT_Date < 20180101) AND (t2.Min < 4500) and (t2.Max > 7000) AND (t2.Filename NOT LIKE '%gal%');"
-    >>> result = mysql_query(dbp.usr, dbp.pswd, dbp.db, query)
-    >>> len(result)
-    6979
-    >>> type(result)
-    <class 'list'>
-    >>> type(result[0])
-    <class 'dict'>
-
-    >>> query2 = "SELECT ObjName FROM objects LIMIT 10;"
-    >>> result2 = mysql_query(dbp.usr, dbp.pswd, dbp.db, query2)
-    >>> len(result2)
-    10
-    >>> result2[1]['ObjName']
-    'SN 1954A'
-
-    # one more test on a realistic query here: make sure that keys are what is expected, etc.
-    '''
-
-    # connect to db
-    connection = sql.connect(user = usr, password = pswd, db = db, cursorclass = sql.cursors.DictCursor)
-
-    # issue query and get results
-    with connection.cursor() as cursor:
-        cursor.execute(query)
-        results = cursor
-
-    # return results
-    return list(results)
 
 def main(query = None, n_bins = 1024, n_regions = 16, tet = (0.8, 0.2), norm = True, base_dir = dbp.base_dir, rs = 100):
     '''
@@ -108,7 +62,8 @@ def main(query = None, n_bins = 1024, n_regions = 16, tet = (0.8, 0.2), norm = T
     # otherwise, execute query against database, retrieve results, and write to disk for later use
     else:
         print('querying database...')
-        results = mysql_query(dbp.usr, dbp.pswd, dbp.db, query)
+        results = query.all()
+        #results = mysql_query(dbp.usr, dbp.pswd, dbp.db, query)
         with open(query_fl, 'w') as f:
             f.write(query)
         with open(query_res_fl, 'wb') as f:
@@ -135,7 +90,10 @@ def main(query = None, n_bins = 1024, n_regions = 16, tet = (0.8, 0.2), norm = T
         pr_spectra = np.zeros((len(results), n_bins))
         labels = np.zeros(len(results), dtype=object)
         for idx, row in enumerate(tqdm(results)):
-            s = Spectrum(row['ObjName'], row['SNID_Subtype'], base_dir + row['Filepath'] + '/' + row['Filename'], row['Redshift_Gal'])
+            st = row.Spectra
+            ot = row.Objects
+            s = Spectrum(ot.ObjName, st.SNID_subtype, base_dir + st.Filepath + '/' + st.Filename, ot.Redshift_Gal)
+            #s = Spectrum(row['ObjName'], row['SNID_Subtype'], base_dir + row['Filepath'] + '/' + row['Filename'], row['Redshift_Gal'])
             pr_spectra[idx, :] = s.preprocess(n_bins = n_bins)[:,1]
             labels[idx] = s.type
         np.savez(proc_fl, pr_spectra, labels)
@@ -149,6 +107,7 @@ def main(query = None, n_bins = 1024, n_regions = 16, tet = (0.8, 0.2), norm = T
     X_train, y_train, X_test, y_test = mlp.train_test_val_split(tet = tet)
     np.savez(feat_fl, X_train, y_train, X_test, y_test)
     print('done --- results written to {}'.format(feat_fl))
+
     # normalize based on training data (optionally)
     if norm:
         X_train = mlp.X_scaler.transform(X_train)
@@ -179,13 +138,10 @@ def main(query = None, n_bins = 1024, n_regions = 16, tet = (0.8, 0.2), norm = T
         pkl.dump(best_mod, f)
     print('\nbest model written to file: {}'.format(best_mod_fl))
 
-"""
-example query
+# set query and run
+if __name__ == "__main__":
 
-SELECT t1.ObjName, t2.Filename, t2.Filepath, t1.Redshift_Gal, t2.SNID_Subtype FROM objects as t1, spectra as t2 WHERE (t1.ObjID = t2.ObjID) AND (t1.Redshift_Gal != 'NULL') AND (t2.SNID_Subtype LIKE 'Ia%') AND (t2.UT_Date > 20090101) AND (t2.UT_Date < 20180101) AND (t2.Min < 4500) and (t2.Max > 7000) AND (t2.Filename NOT LIKE '%gal%') AND (t1.DiscDate > DATE('2008-01-01'));
-"""
-
-# do tests
-#if __name__ == "__main__":
-#    import doctest
-#    doctest.testmod()
+    s = SNDB.get_session(dbp.usr, dbp.pswd, dbp.host, dbp.db)
+    query = s.query(Spectra, Objects).filter(Spectra.ObjID == Objects.ObjID).filter(Objects.Redshift_Gal >= 0).filter(
+        Spectra.SNID_Subtype != 'NULL').filter(Spectra.Min < 4500).filter(Spectra.Max > 7000).filter(~Spectra.SNID_Subtype.like('%,%')).limit(10)
+    main(query = query)
