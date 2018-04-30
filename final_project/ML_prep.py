@@ -101,7 +101,11 @@ class ML_prep:
 
         # create container for features and then populate
         features = np.zeros((self.spectra.shape[0], 2 * n_regions))
-        features[:, :n_regions] = np.split(self.spectra, n_regions, axis = 1)
+
+        # midpoint of each region
+        features[:, :n_regions] = self.spectra[:, int(self.spectra.shape[1]/(2*n_regions))::int(self.spectra.shape[1]/n_regions)]
+        
+        # integrated area of each region
         features[:, n_regions:] = ML_prep.integ_reg_area(self.spectra, n_regions = n_regions)
         return features
 
