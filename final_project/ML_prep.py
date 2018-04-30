@@ -213,25 +213,27 @@ class ML_prep:
         >>> data = np.load('test_files/proc_test.npz')
         >>> mlp = ML_prep(data['arr_0'], data['arr_1'], n_regions = 16)
         >>> X_train, y_train, X_test, y_test = mlp.train_test_val_split(tet = (0.625, 0.375))
-        >>> X_train.shape
-        (10, 32)
+        >>> X_train, y_train, X_test, y_test = mlp.train_test_val_split(tet = (0.8, 0.2), os_train = False)
+        >>> X_train.shape 
+        (8, 32)
         >>> X_test.shape
-        (6, 32)
+        (2, 32)
         >>> len(y_train)
-        10
+        8
         >>> len(y_test)
-        6
+        2
         >>> X_train, y_train, X_test, y_test, X_val, y_val = mlp.train_test_val_split(tet = (0.625, 0.250, 0.125))
+        >>> X_train, y_train, X_test, y_test, X_val, y_val = mlp.train_test_val_split(tet = (0.6, 0.2, 0.2), os_train = False)
         >>> X_train.shape
-        (10, 32)
+        (6, 32)
         >>> X_test.shape
-        (4, 32)
+        (2, 32)
         >>> X_val.shape
         (2, 32)
         >>> len(y_train)
-        10
+        6
         >>> len(y_test)
-        4
+        2
         >>> len(y_val)
         2
         '''
@@ -251,15 +253,15 @@ class ML_prep:
             y_train = y_train[train_ind]
             c, u = np.unique(y_train, return_counts=True)
         elif not os_train:
-            X_train = self.X[suff_ind[:int(tet[0]*dlen)],:]
+            X_train = self.X[shuff_ind[:int(tet[0]*dlen)],:]
         self.X_scaler.fit(X_train)
 
         # construct testing(, validation) sets
         X_test = self.X[shuff_ind[int(tet[0]*dlen):int((tet[0]+tet[1])*dlen)],:]
         y_test = self.y[shuff_ind[int(tet[0]*dlen):int((tet[0]+tet[1])*dlen)]]
         if len(tet) == 3:
-            X_val = self.X[shuf_ind[-int(tet[2]*dlen):],:]
-            y_val = self.y[shuf_ind[-int(tet[2]*dlen):]]
+            X_val = self.X[shuff_ind[-int(tet[2]*dlen):],:]
+            y_val = self.y[shuff_ind[-int(tet[2]*dlen):]]
             return X_train, y_train, X_test, y_test, X_val, y_val
         elif len(tet) == 2:
             return X_train, y_train, X_test, y_test
