@@ -1,5 +1,6 @@
 # imports
 import numpy as np
+from Spectrum import Spectrum
 from sklearn.preprocessing import StandardScaler
 from scipy.integrate import simps
 
@@ -99,8 +100,9 @@ class ML_prep:
         '''
 
         # create container for features and then populate
-        features = np.zeros((self.spectra.shape[0], n_regions))
-        features[:, :n_regions] = ML_prep.integ_reg_area(self.spectra, n_regions = n_regions)
+        features = np.zeros((self.spectra.shape[0], 2 * n_regions))
+        features[:, :n_regions] = np.split(self.spectra, n_regions, axis = 1)
+        features[:, n_regions:] = ML_prep.integ_reg_area(self.spectra, n_regions = n_regions)
         return features
 
     def proc_labels(self):
