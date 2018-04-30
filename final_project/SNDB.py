@@ -24,6 +24,17 @@ class Objects(Base):
 def get_session(usr, pswd, host, db):
     '''
     starts an sqlalchemy session and returns it
+
+    Parameters
+    ----------
+    usr : database username
+    pswd : database password
+    host : database host
+    db : database name
+
+    Returns
+    -------
+    session : sqlalchemy session through which queries can be run against database
     '''
 
     engine = create_engine("mysql://{}:{}@{}/{}".format(usr, pswd, host, db))
