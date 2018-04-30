@@ -6,6 +6,10 @@ from sqlalchemy.orm import sessionmaker
 Base = declarative_base()
 
 class Spectra(Base):
+    '''
+    interface to spectra table in SNDB
+    '''
+
     __tablename__ = 'spectra'
     SpecID = Column(Integer, primary_key=True)
     ObjID = Column(Integer)
@@ -16,6 +20,10 @@ class Spectra(Base):
     Max = Column(String)
 
 class Objects(Base):
+    '''
+    interface to objects table in SNDB
+    '''
+
     __tablename__ = 'objects'
     ObjID = Column(Integer, primary_key=True)
     ObjName = Column(String)
