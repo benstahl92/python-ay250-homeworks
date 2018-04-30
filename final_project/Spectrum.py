@@ -46,7 +46,7 @@ class Spectrum:
 
         Doctests/Examples
         -----------------
-        >>> s = Spectrum('SN 1997y', 'Ia-norm', 'sn1997y-19970209-uohp.flm', 0.01587, 44.2219)
+        >>> s = Spectrum('SN 1997y', 'Ia-norm', 'test_files/sn1997y-19970209-uohp.flm', 0.01587, 44.2219)
         >>> s.name
         'SN 1997y'
         >>> s.z
@@ -85,7 +85,7 @@ class Spectrum:
 
         Doctests/Examples
         -----------------
-        >>> Spectrum.read_file('sn1997y-19970209-uohp.flm').shape
+        >>> Spectrum.read_file('test_files/sn1997y-19970209-uohp.flm').shape
         (3361, 2)
         '''
         
@@ -108,7 +108,7 @@ class Spectrum:
 
         Doctests/Examples
         -----------------
-        >>> s = Spectrum('SN 1997y', 'Ia-norm', 'sn1997y-19970209-uohp.flm', 0.01587, 44.2219)
+        >>> s = Spectrum('SN 1997y', 'Ia-norm', 'test_files/sn1997y-19970209-uohp.flm', 0.01587, 44.2219)
         >>> dz = Spectrum.dez(s.spec, s.z)
         >>> dz[:,0].max() <= s.spec[:,0].max()
         True
@@ -139,7 +139,7 @@ class Spectrum:
 
         Doctests/Examples
         -----------------
-        >>> s = Spectrum('SN 1997y', 'Ia-norm', 'sn1997y-19970209-uohp.flm', 0.01587, 44.2219)
+        >>> s = Spectrum('SN 1997y', 'Ia-norm', 'test_files/sn1997y-19970209-uohp.flm', 0.01587, 44.2219)
         >>> mf = Spectrum.sp_medfilt(s.spec, ksize=45)
         >>> mf[:,1].std() < s.spec[:,1].std()
         True
@@ -168,7 +168,7 @@ class Spectrum:
 
         Doctests/Examples
         -----------------
-        >>> s = Spectrum('SN 1997y', 'Ia-norm', 'sn1997y-19970209-uohp.flm', 0.01587, 44.2219)
+        >>> s = Spectrum('SN 1997y', 'Ia-norm', 'test_files/sn1997y-19970209-uohp.flm', 0.01587, 44.2219)
         >>> lb = Spectrum.log_bin(s.spec, n_bins = 1024)
         >>> lb.shape
         (1024, 2)
@@ -203,7 +203,7 @@ class Spectrum:
 
         Doctests/Examples
         -----------------
-        >>> s = Spectrum('SN 1997y', 'Ia-norm', 'sn1997y-19970209-uohp.flm', 0.01587, 44.2219)
+        >>> s = Spectrum('SN 1997y', 'Ia-norm', 'test_files/sn1997y-19970209-uohp.flm', 0.01587, 44.2219)
         >>> Spectrum.cont_subtr(s.spec).shape[1]
         2
         '''
@@ -235,7 +235,7 @@ class Spectrum:
 
         Doctests/Examples
         -----------------
-        >>> s = Spectrum('SN 1997y', 'Ia-norm', 'sn1997y-19970209-uohp.flm', 0.01587, 44.2219)
+        >>> s = Spectrum('SN 1997y', 'Ia-norm', 'test_files/sn1997y-19970209-uohp.flm', 0.01587, 44.2219)
         >>> a = Spectrum.apodize(s.spec, end_pct = 0.05)
         >>> np.abs(a[0,1]) < np.abs(s.spec[0,1])
         True
@@ -268,7 +268,7 @@ class Spectrum:
 
         Doctests/Examples
         -----------------
-        >>> s = Spectrum('SN 1997y', 'Ia-norm', 'sn1997y-19970209-uohp.flm', 0.01587, 44.2219)
+        >>> s = Spectrum('SN 1997y', 'Ia-norm', 'test_files/sn1997y-19970209-uohp.flm', 0.01587, 44.2219)
         >>> fn = Spectrum.flux_norm(s.spec)
         >>> np.abs(fn[:,1].mean()) < 0.001 # tolerance on being close enough to zero
         True
@@ -303,7 +303,7 @@ class Spectrum:
 
         Doctests/Examples
         -----------------
-        >>> s = Spectrum('SN 1997y', 'Ia-norm', 'sn1997y-19970209-uohp.flm', 0.01587, 44.2219)
+        >>> s = Spectrum('SN 1997y', 'Ia-norm', 'test_files/sn1997y-19970209-uohp.flm', 0.01587, 44.2219)
         >>> p = s.preprocess(n_bins = 1024)
         >>> p.shape
         (1024, 2)

@@ -43,12 +43,16 @@ class ML_prep:
 
         Doctests/Examples
         -----------------
-        >>> s = Spectrum('SN 1997y', 'Ia-norm', 'sn1997y-19970209-uohp.flm', 0.01587, 44.2219)
+        >>> s = Spectrum('SN 1997y', 'Ia-norm', 'test_files/sn1997y-19970209-uohp.flm', 0.01587, 44.2219)
         >>> mlp = ML_prep(s.preprocess()[:,1].reshape(1,-1), np.array([s.type]), n_regions = 16)
-        >>> len(mlp.osi) >= len(mlp.labels)
+        >>> mlp.X.shape
+        (1, 32)
+        >>> data = np.load('test_files/proc_test.npz')
+        >>> mlp = ML_prep(data['arr_0'], data['arr_1'], n_regions = 16)
+        >>> mlp.spectra.shape[0] == len(mlp.labels)
         True
         >>> mlp.X.shape
-        (1, 16)
+        (10, 32)
         '''
 
         # full (un-prepared) sets
@@ -77,6 +81,13 @@ class ML_prep:
         Returns
         -------
         2d array where each row corresponds to the integrated area of each region of a given spectrum
+
+        Doctests/Examples
+        -----------------
+        >>> data = np.load('test_files/proc_test.npz')
+        >>> mlp = ML_prep(data['arr_0'], data['arr_1'], n_regions = 16)
+        >>> ML_prep.integ_reg_area(mlp.spectra, n_regions = 16).shape
+        (10, 16)
         '''
 
         # split spectra into n_regions then integrate each of those regions
@@ -97,6 +108,13 @@ class ML_prep:
         Returns
         -------
         features : 2d array where each row corresponds features of a given spectrum
+
+        Doctests/Examples
+        -----------------
+        >>> data = np.load('test_files/proc_test.npz')
+        >>> mlp = ML_prep(data['arr_0'], data['arr_1'], n_regions = 16)
+        >>> mlp.featurize(n_regions = 16).shape
+        (10, 32)
         '''
 
         # create container for features and then populate
@@ -120,6 +138,13 @@ class ML_prep:
         Returns
         -------
         unmodified labels (trivial, but in the future only this function would need to be modified to adjust this)
+
+        Doctests/Examples
+        -----------------
+        >>> data = np.load('test_files/proc_test.npz')
+        >>> mlp = ML_prep(data['arr_0'], data['arr_1'], n_regions = 16)
+        >>> len(mlp.labels) == 10
+        True
         '''
 
         return self.labels
@@ -135,6 +160,13 @@ class ML_prep:
         Returns
         -------
         osi : (shuffled) array of indices corresponding to labels that have been oversampled to match the most common label
+
+        Doctests/Examples
+        -----------------
+        >>> data = np.load('test_files/proc_test.npz')
+        >>> mlp = ML_prep(data['arr_0'], data['arr_1'], n_regions = 16)
+        >>> len(ML_prep.os_balance(mlp.labels))
+        16
         '''
 
         # get unique labels and their counts
