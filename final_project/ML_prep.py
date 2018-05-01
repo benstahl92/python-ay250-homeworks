@@ -125,7 +125,7 @@ class ML_prep:
         '''
 
         # create container for features and then populate
-        r_region_size = int(factorial(r_regions - 1))
+        r_region_size = int(r_regions * (r_regions - 1) / 2)
         features = np.zeros((self.spectra.shape[0], 2 * regions + r_region_size))
 
         # midpoint of each region
@@ -141,6 +141,7 @@ class ML_prep:
             # set divisions by zero to zero
             a_ratios.append(np.divide(areas[:, (i+1):],  areas[:, :-(i+1)], where = areas[:, :-(i+1)] != 0))
         features[:, -r_region_size:] = np.concatenate(a_ratios, axis = 1)
+
         return features
 
     def proc_labels(self):

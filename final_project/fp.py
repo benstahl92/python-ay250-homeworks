@@ -195,5 +195,5 @@ if __name__ == "__main__":
     s = SNDB.get_session(dbp.usr, dbp.pswd, dbp.host, dbp.db)
     query = s.query(Spectra, Objects).filter(Spectra.ObjID == Objects.ObjID).filter(Objects.Redshift_Gal >= 0).filter(
           Spectra.SNID_Subtype != 'NULL').filter(Spectra.Min < 4500).filter(Spectra.Max > 7000).filter(
-          ~Spectra.SNID_Subtype.like('%,%')).filter(Spectra.SNID_Subtype.like('I%'))
-    main()
+          ~Spectra.SNID_Subtype.like('%,%')).filter(Spectra.SNID_Subtype.like('I%')).limit(10)
+    main(query = query, n_min = None)
