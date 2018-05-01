@@ -173,7 +173,7 @@ def main(query = None, n_min = 50, n_bins = 1024, n_regions = 16, tet = (0.8, 0.
     # do a grid search with a random forest algorithm and k fold cross-validation to identify the best hyper parameters
     est = RandomForestClassifier()
     param_grid = {'n_estimators': np.arange(25, 150, 25), 'max_depth': np.arange(2, 12, 2),
-                  'min_samples_split': np.arange(2, 12, 2), 'max_features': np.arange(25, 150, 25), 'min_samples_leaf': np.arange(2, 12, 2)}
+                  'min_samples_split': np.arange(2, 12, 2), 'max_features': np.arange(2, 32, 6), 'min_samples_leaf': np.arange(2, 12, 2)}
     print('\ncommencing Random Forest grid search over the following parameter grid:')
     print(param_grid)
     gs_rf = GridSearchCV(est, param_grid, n_jobs = -1, cv = cv)
