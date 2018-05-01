@@ -30,14 +30,34 @@ import db_params as dbp
 
 def main(query = None, n_min = 50, n_bins = 1024, n_regions = 16, tet = (0.8, 0.2), norm = True, base_dir = dbp.base_dir, rs = 100):
     '''
+    provides top level execution of final project
+        retrieves spectral metadata (either from database query or from saved database query results)
+        performs pre-processing steps on all spectra (or retrieves saved pre-processed data)
+        featurizes pre-processed data for ingestion by ML models
+        trains ML classifiers, computes success metrics, saves results to file
+
+    Examples and doctests can be found in the docstrings of all functions and classes used by this function
+
     Parameters
     ----------
-    query : valid MySQL query
-    query_res_fl : pkl file containing a dictionary of results yielded by a mysql_query function call
+    query (optional, sqlalchemy query instance) : sqlalchemy query instance through which data is pulled from SNDB
+                                                  (NB: if None, query results should be stored in checkpoints/query_results.pkl)
+    n_min (optional, int) : minimum number of examples of a given subtype for it be included in classifier training
+    n_bins (optional, int) : number of bins in new wavelength scale
+    n_regions (optional, int) : number of regions to break each spectrum into for integrating
+                                (NB: dividing this into n_bins from the Spectrum class should result in an integer)
+    tet (optional, tuple) : 2 (or 3) element tuple containing the proportions to select for training, testing(, validation) 
+    norm (optional, bool) : selects whether to normalize data based on training set
+    base_dir (optional, str) : base path that all spectra filepaths are relative to
+    rs (optional, int) : seed for random state
 
-    Returns
+    Outputs
     -------
-
+    'checkpoints/query_results.pkl' : pkl file containing query results (no need to duplicate db interactions if query doesn't change)
+    'checkpoints/query.txt' : plain text SQL query corresponding to contents of 'checkpoints/query_results.pkl'
+    'checkpoints/proc.npz' : file containing two arrays (preprocessed spectra and labels), so no need to re-preprocess on the same data
+    'checkpoints/feat.npz' : file containing four arrays (X_train, y_train, X_test, y_test)
+    'best_mod.pkl' : pkl file containing a dictionary with ML results (best models, baseline, X_scaler)
     '''
 
     # global filenames for storage
