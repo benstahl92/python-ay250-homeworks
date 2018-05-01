@@ -3,6 +3,7 @@ import numpy as np
 from Spectrum import Spectrum
 from sklearn.preprocessing import StandardScaler
 from scipy.integrate import simps
+from scipy.special import factorial
 
 class ML_prep:
     '''
@@ -24,11 +25,11 @@ class ML_prep:
 
     Functions
     ---------
-    integ_reg_area : breaks each spectrum into n_regions and calculates (and returns) the integrated area of each region
+    integ_reg_area : breaks each spectrum into regions and calculates (and returns) the integrated area of each region
     os_balance : makes number of occurrences of each label (and associated features) the same by oversampling
     '''
 
-    def __init__(self, spectra, labels, n_regions = 16, rs = 100):
+    def __init__(self, spectra, labels, regions = 16, r_regions = 5, rs = 100):
         '''
         instantiation instructions
 
@@ -37,22 +38,22 @@ class ML_prep:
         (object instance)
         spectra : 2d array where each row corresponds to the flux of a given spectrum
         labels : array of subtypes corresponding to the SNe in the rows of spectra
-        n_regions (optional, int) : number of regions to break each spectrum into for integrating
+        regions (optional, int) : number of regions to break each spectrum into for integrating
                                     (NB: dividing this into n_bins from the Spectrum class should result in an integer)
         rs : random state
 
         Doctests/Examples
         -----------------
         >>> s = Spectrum('SN 1997y', 'Ia-norm', 'test_files/sn1997y-19970209-uohp.flm', 0.01587, 44.2219)
-        >>> mlp = ML_prep(s.preprocess()[:,1].reshape(1,-1), np.array([s.type]), n_regions = 16)
+        >>> mlp = ML_prep(s.preprocess()[:,1].reshape(1,-1), np.array([s.type]), regions = 16, r_regions = 5)
         >>> mlp.X.shape
-        (1, 32)
+        (1, 80)
         >>> data = np.load('test_files/proc_test.npz')
-        >>> mlp = ML_prep(data['arr_0'], data['arr_1'], n_regions = 16)
+        >>> mlp = ML_prep(data['arr_0'], data['arr_1'], regions = 16, r_regions = 5)
         >>> mlp.spectra.shape[0] == len(mlp.labels)
         True
         >>> mlp.X.shape
-        (10, 32)
+        (10, 80)
         '''
 
         # full (un-prepared) sets
@@ -60,7 +61,7 @@ class ML_prep:
         self.labels = labels
 
         # full (featurized but not oversampled) sets
-        self.X = self.featurize(n_regions = n_regions)
+        self.X = self.featurize(regions = regions)
         self.y = self.proc_labels()
 
         # X scaler to be fitted to training data
@@ -68,15 +69,14 @@ class ML_prep:
 
         np.random.seed(rs)
 
-    def integ_reg_area(spectra, n_regions = 16):
+    def integ_reg_area(spectra, regions = 16):
         '''
-        breaks each spectrum into n_regions and calculates (and returns) the integrated area of each region
+        breaks each spectrum into regions and calculates (and returns) the integrated area of each region
 
         Parameters
         ----------
         spectra : 2d array where each row corresponds to the flux of a given spectrum
-        n_regions (optional, int) : number of regions to break each spectrum into for integrating
-                                    (NB: dividing this into n_bins from the Spectrum class should result in an integer)
+        regions (optional, int) : number of regions to break each spectrum into for integrating
 
         Returns
         -------
@@ -85,25 +85,26 @@ class ML_prep:
         Doctests/Examples
         -----------------
         >>> data = np.load('test_files/proc_test.npz')
-        >>> mlp = ML_prep(data['arr_0'], data['arr_1'], n_regions = 16)
-        >>> ML_prep.integ_reg_area(mlp.spectra, n_regions = 16).shape
+        >>> mlp = ML_prep(data['arr_0'], data['arr_1'], regions = 16)
+        >>> ML_prep.integ_reg_area(mlp.spectra, regions = 16).shape
         (10, 16)
         '''
 
-        # split spectra into n_regions then integrate each of those regions
-        regions = np.split(spectra, n_regions, axis = 1)
+        # split spectra into regions then integrate each of those regions
+        regions = np.array_split(spectra, regions, axis = 1)
         return simps(regions, axis = 2).T
 
-    def featurize(self, n_regions = 16):
+    def featurize(self, regions = 16, r_regions = 5):
         '''
         featurizes spectra for ingestion by ML models
-            features are integrated areas of regions of each spectrum
+            features are integrated areas of regions of each spectrum, the flux at midpoint of each region
+            additional features are extracted by breaking each spectrum into r_regions and computing all 
+                permutations of the ratios of integrated areas and midpoint fluxes
 
         Parameters
         ----------
         (object instance)
-        n_regions (optional, int) : number of regions to break each spectrum into for integrating
-                                    (NB: dividing this into n_bins from the Spectrum class should result in an integer)
+        regions (optional, int) : number of regions to break each spectrum into for integrating
 
         Returns
         -------
@@ -112,19 +113,32 @@ class ML_prep:
         Doctests/Examples
         -----------------
         >>> data = np.load('test_files/proc_test.npz')
-        >>> mlp = ML_prep(data['arr_0'], data['arr_1'], n_regions = 16)
-        >>> mlp.featurize(n_regions = 16).shape
-        (10, 32)
+        >>> mlp = ML_prep(data['arr_0'], data['arr_1'], regions = 16, r_regions = 5)
+        >>> mlp.featurize(regions = 16, r_regions = 5).shape
+        (10, 80)
         '''
 
         # create container for features and then populate
-        features = np.zeros((self.spectra.shape[0], 2 * n_regions))
+        r_region_size = int(factorial(r_regions - 1))
+        features = np.zeros((self.spectra.shape[0], 2 * (regions + r_region_size)))
 
         # midpoint of each region
-        features[:, :n_regions] = self.spectra[:, int(self.spectra.shape[1]/(2*n_regions))::int(self.spectra.shape[1]/n_regions)]
+        features[:, :regions] = self.spectra[:, int(self.spectra.shape[1]/(2*regions))::int(self.spectra.shape[1]/regions)]
         
         # integrated area of each region
-        features[:, n_regions:] = ML_prep.integ_reg_area(self.spectra, n_regions = n_regions)
+        features[:, regions:(2*regions)] = ML_prep.integ_reg_area(self.spectra, regions = regions)
+
+        # compute all ratio permutations
+        midpoints = self.spectra[:, int(self.spectra.shape[1]/(2*r_regions))::int(self.spectra.shape[1]/r_regions)]
+        areas = ML_prep.integ_reg_area(self.spectra, regions = r_regions)
+        m_ratios = []
+        a_ratios = []
+        for idx in range(r_regions - 1):
+            m_ratios.append(midpoints[:-(i+1)] / midpoints[(i+1):])
+            a_ratios.append(areas[:-(i+1)] / areas[(i+1):])
+        features[:, (2*regions):(2*regions + r_region_size)] = np.concatenate(m_ratios, axis = 0)
+        features[:, -r_region_size:] = np.concatenate(a_ratios, axis = 0)
+
         return features
 
     def proc_labels(self):
@@ -142,7 +156,7 @@ class ML_prep:
         Doctests/Examples
         -----------------
         >>> data = np.load('test_files/proc_test.npz')
-        >>> mlp = ML_prep(data['arr_0'], data['arr_1'], n_regions = 16)
+        >>> mlp = ML_prep(data['arr_0'], data['arr_1'], regions = 16, r_regions = 5)
         >>> len(mlp.labels) == 10
         True
         '''
@@ -164,7 +178,7 @@ class ML_prep:
         Doctests/Examples
         -----------------
         >>> data = np.load('test_files/proc_test.npz')
-        >>> mlp = ML_prep(data['arr_0'], data['arr_1'], n_regions = 16)
+        >>> mlp = ML_prep(data['arr_0'], data['arr_1'], regions = 16, r_regions = 5)
         >>> len(ML_prep.os_balance(mlp.labels))
         16
         '''
@@ -211,13 +225,13 @@ class ML_prep:
         splitting : list of length 4 (or 6) containing the splits of training, testing(, validation) data (each split is X, y)
 
         >>> data = np.load('test_files/proc_test.npz')
-        >>> mlp = ML_prep(data['arr_0'], data['arr_1'], n_regions = 16)
+        >>> mlp = ML_prep(data['arr_0'], data['arr_1'], regions = 16, r_regions = 5)
         >>> X_train, y_train, X_test, y_test = mlp.train_test_val_split(tet = (0.625, 0.375))
         >>> X_train, y_train, X_test, y_test = mlp.train_test_val_split(tet = (0.8, 0.2), os_train = False)
         >>> X_train.shape 
-        (8, 32)
+        (8, 80)
         >>> X_test.shape
-        (2, 32)
+        (2, 80)
         >>> len(y_train)
         8
         >>> len(y_test)
@@ -225,11 +239,11 @@ class ML_prep:
         >>> X_train, y_train, X_test, y_test, X_val, y_val = mlp.train_test_val_split(tet = (0.625, 0.250, 0.125))
         >>> X_train, y_train, X_test, y_test, X_val, y_val = mlp.train_test_val_split(tet = (0.6, 0.2, 0.2), os_train = False)
         >>> X_train.shape
-        (6, 32)
+        (6, 80)
         >>> X_test.shape
-        (2, 32)
+        (2, 80)
         >>> X_val.shape
-        (2, 32)
+        (2, 80)
         >>> len(y_train)
         6
         >>> len(y_test)
