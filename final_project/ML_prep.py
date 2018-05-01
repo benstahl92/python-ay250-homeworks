@@ -61,7 +61,7 @@ class ML_prep:
         self.labels = labels
 
         # full (featurized but not oversampled) sets
-        self.X = self.featurize(regions = regions)
+        self.X = self.featurize(regions = regions, r_regions = r_regions)
         self.y = self.proc_labels()
 
         # X scaler to be fitted to training data
@@ -91,15 +91,15 @@ class ML_prep:
         '''
 
         # split spectra into regions then integrate each of those regions
-        regions = np.array_split(spectra, regions, axis = 1)
-        return simps(regions, axis = 2).T
+        sections = np.split(spectra, regions, axis = 1)
+        return simps(sections, axis = 2).T
 
-    def featurize(self, regions = 16, r_regions = 5):
+    def featurize(self, regions = 16, r_regions = 4):
         '''
         featurizes spectra for ingestion by ML models
             features are integrated areas of regions of each spectrum, the flux at midpoint of each region
             additional features are extracted by breaking each spectrum into r_regions and computing all 
-                permutations of the ratios of integrated areas and midpoint fluxes
+                permutations of the ratios of integrated areas
 
         Parameters
         ----------
@@ -120,7 +120,7 @@ class ML_prep:
 
         # create container for features and then populate
         r_region_size = int(factorial(r_regions - 1))
-        features = np.zeros((self.spectra.shape[0], 2 * (regions + r_region_size)))
+        features = np.zeros((self.spectra.shape[0], 2 * regions + r_region_size))
 
         # midpoint of each region
         features[:, :regions] = self.spectra[:, int(self.spectra.shape[1]/(2*regions))::int(self.spectra.shape[1]/regions)]
@@ -129,16 +129,12 @@ class ML_prep:
         features[:, regions:(2*regions)] = ML_prep.integ_reg_area(self.spectra, regions = regions)
 
         # compute all ratio permutations
-        midpoints = self.spectra[:, int(self.spectra.shape[1]/(2*r_regions))::int(self.spectra.shape[1]/r_regions)]
         areas = ML_prep.integ_reg_area(self.spectra, regions = r_regions)
-        m_ratios = []
         a_ratios = []
-        for idx in range(r_regions - 1):
-            m_ratios.append(midpoints[:-(i+1)] / midpoints[(i+1):])
-            a_ratios.append(areas[:-(i+1)] / areas[(i+1):])
-        features[:, (2*regions):(2*regions + r_region_size)] = np.concatenate(m_ratios, axis = 0)
-        features[:, -r_region_size:] = np.concatenate(a_ratios, axis = 0)
-
+        for i in range(r_regions - 1):
+            # set divisions by zero to zero
+            a_ratios.append(np.divide(areas[:, (i+1):],  areas[:, :-(i+1)], where = areas[:, :-(i+1)] != 0))
+        features[:, -r_region_size:] = np.concatenate(a_ratios, axis = 1)
         return features
 
     def proc_labels(self):

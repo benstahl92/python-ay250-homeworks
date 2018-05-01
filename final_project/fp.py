@@ -29,7 +29,7 @@ from SNDB import Spectra, Objects
 # login credentials of MySQL database
 import db_params as dbp
 
-def main(query = None, n_min = 50, n_bins = 1024, n_regions = 16, tet = (0.8, 0.2), norm = True, base_dir = dbp.base_dir, rs = 100):
+def main(query = None, n_min = 50, n_bins = 1024, regions = 16, r_regions = 4, tet = (0.8, 0.2), norm = True, base_dir = dbp.base_dir, rs = 100):
     '''
     provides top level execution of final project
         retrieves spectral metadata (either from database query or from saved database query results)
@@ -141,7 +141,7 @@ def main(query = None, n_min = 50, n_bins = 1024, n_regions = 16, tet = (0.8, 0.
 
     # extract features and split into test, evaluation, and training sets
     print('\nfeaturizing data and extracting training, validation, and testing sets with oversampling...')
-    mlp = ML_prep(pr_spectra, labels, n_regions = n_regions)
+    mlp = ML_prep(pr_spectra, labels, regions = regions, r_regions = r_regions)
     X_train, y_train, X_test, y_test = mlp.train_test_val_split(tet = tet)
     np.savez(feat_fl, X_train, y_train, X_test, y_test)
     print('done --- results written to {}'.format(feat_fl))
