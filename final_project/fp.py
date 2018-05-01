@@ -15,6 +15,7 @@ from tqdm import tqdm
 # machine learning imports
 from sklearn.dummy import DummyClassifier
 from sklearn.neighbors import KNeighborsClassifier
+from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import GridSearchCV
 from sklearn.model_selection import KFold
 from sklearn.metrics import accuracy_score
@@ -161,16 +162,28 @@ def main(query = None, n_min = 50, n_bins = 1024, n_regions = 16, tet = (0.8, 0.
     est = KNeighborsClassifier()
     cv = KFold(n_splits = 6, random_state = rs)
     param_grid = {'n_neighbors': [3, 9, 15, 21], 'weights': ['uniform', 'distance'], 'leaf_size': [10, 15, 20, 25, 30]}
-    print('\ncommencing grid search over the following parameter grid:')
+    print('\ncommencing KNN grid search over the following parameter grid:')
     print(param_grid)
-    gs = GridSearchCV(est, param_grid, n_jobs = -1, cv = cv)
-    gs.fit(X_train, y_train)
-    print('done --- best parameters (score: {:.3f}):'.format(gs.best_score_))
-    print(gs.best_params_)
-    print('accuracy: {:.3f}'.format(gs.score(X_test, y_test)))
+    gs_knn = GridSearchCV(est, param_grid, n_jobs = -1, cv = cv)
+    gs_knn.fit(X_train, y_train)
+    print('done --- best parameters (score: {:.3f}):'.format(gs_knn.best_score_))
+    print(gs_knn.best_params_)
+    print('accuracy: {:.3f}'.format(gs_knn.score(X_test, y_test)))
+
+    # do a grid search with a random forest algorithm and k fold cross-validation to identify the best hyper parameters
+    est = RandomForestClassifier()
+    param_grid = {'n_estimators': np.arange(25, 150, 25), 'max_depth': np.arange(2, 12, 2),
+                  'min_samples_split': np.arange(2, 12, 2), 'max_features': np.arange(25, 150, 25), 'min_samples_leaf': np.arange(2, 12, 2)}
+    print('\ncommencing Random Forest grid search over the following parameter grid:')
+    print(param_grid)
+    gs_rf = GridSearchCV(est, param_grid, n_jobs = -1, cv = cv)
+    gs_rf.fit(X_train, y_train)
+    print('done --- best parameters (score: {:.3f}):'.format(gs_rf.best_score_))
+    print(gs_rf.best_params_)
+    print('accuracy: {:.3f}'.format(gs_rf.score(X_test, y_test)))
 
     # save best model, X_scaler, and baseline for future reference
-    best_mod = {'model': gs.best_estimator_, 'X_scaler': mlp.X_scaler, 'baseline': baseline}
+    best_mod = {'knn': gs_knn.best_estimator_, 'rf': gs_rf.best_estimator_, 'X_scaler': mlp.X_scaler, 'baseline': baseline}
     with open(best_mod_fl, 'wb') as f:
         pkl.dump(best_mod, f)
     print('\nbest model written to file: {}'.format(best_mod_fl))
