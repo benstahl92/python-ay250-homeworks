@@ -29,7 +29,7 @@ class ML_prep:
     os_balance : makes number of occurrences of each label (and associated features) the same by oversampling
     '''
 
-    def __init__(self, spectra, labels, regions = 20, r_regions = 5, rs = 100):
+    def __init__(self, spectra, labels, regions = 16, r_regions = 8, rs = 100):
         '''
         instantiation instructions
 
@@ -47,15 +47,15 @@ class ML_prep:
         Doctests/Examples
         -----------------
         >>> s = Spectrum('SN 1997y', 'Ia-norm', 'test_files/sn1997y-19970209-uohp.flm', 0.01587, 44.2219)
-        >>> mlp = ML_prep(s.preprocess()[:,1].reshape(1,-1), np.array([s.type]), regions = 16, r_regions = 5)
+        >>> mlp = ML_prep(s.preprocess()[:,1].reshape(1,-1), np.array([s.type]), regions = 16, r_regions = 8)
         >>> mlp.X.shape
-        (1, 80)
+        (1, 60)
         >>> data = np.load('test_files/proc_test.npz')
-        >>> mlp = ML_prep(data['arr_0'], data['arr_1'], regions = 16, r_regions = 5)
+        >>> mlp = ML_prep(data['arr_0'], data['arr_1'], regions = 16, r_regions = 8)
         >>> mlp.spectra.shape[0] == len(mlp.labels)
         True
         >>> mlp.X.shape
-        (10, 80)
+        (10, 60)
         '''
 
         # full (un-prepared) sets
@@ -71,7 +71,7 @@ class ML_prep:
 
         np.random.seed(rs)
 
-    def integ_reg_area(spectra, regions = 20):
+    def integ_reg_area(spectra, regions = 16):
         '''
         breaks each spectrum into regions and calculates (and returns) the integrated area of each region
 
@@ -97,7 +97,7 @@ class ML_prep:
         sections = np.split(spectra, regions, axis = 1)
         return simps(sections, axis = 2).T
 
-    def featurize(self, regions = 20, r_regions = 5):
+    def featurize(self, regions = 16, r_regions = 8):
         '''
         featurizes spectra for ingestion by ML models
             features are integrated areas of regions of each spectrum, the flux at midpoint of each region
@@ -119,9 +119,9 @@ class ML_prep:
         Doctests/Examples
         -----------------
         >>> data = np.load('test_files/proc_test.npz')
-        >>> mlp = ML_prep(data['arr_0'], data['arr_1'], regions = 16, r_regions = 5)
-        >>> mlp.featurize(regions = 16, r_regions = 5).shape
-        (10, 80)
+        >>> mlp = ML_prep(data['arr_0'], data['arr_1'], regions = 16, r_regions = 8)
+        >>> mlp.featurize(regions = 16, r_regions = 8).shape
+        (10, 60)
         '''
 
         # create container for features and then populate
@@ -159,7 +159,7 @@ class ML_prep:
         Doctests/Examples
         -----------------
         >>> data = np.load('test_files/proc_test.npz')
-        >>> mlp = ML_prep(data['arr_0'], data['arr_1'], regions = 16, r_regions = 5)
+        >>> mlp = ML_prep(data['arr_0'], data['arr_1'], regions = 16, r_regions = 8)
         >>> len(mlp.labels) == 10
         True
         '''
@@ -181,7 +181,7 @@ class ML_prep:
         Doctests/Examples
         -----------------
         >>> data = np.load('test_files/proc_test.npz')
-        >>> mlp = ML_prep(data['arr_0'], data['arr_1'], regions = 16, r_regions = 5)
+        >>> mlp = ML_prep(data['arr_0'], data['arr_1'], regions = 16, r_regions = 8)
         >>> len(ML_prep.os_balance(mlp.labels))
         16
         '''
@@ -228,13 +228,13 @@ class ML_prep:
         splitting : list of length 4 (or 6) containing the splits of training, testing(, validation) data (each split is X, y)
 
         >>> data = np.load('test_files/proc_test.npz')
-        >>> mlp = ML_prep(data['arr_0'], data['arr_1'], regions = 16, r_regions = 5)
+        >>> mlp = ML_prep(data['arr_0'], data['arr_1'], regions = 16, r_regions = 8)
         >>> X_train, y_train, X_test, y_test = mlp.train_test_val_split(tet = (0.625, 0.375))
         >>> X_train, y_train, X_test, y_test = mlp.train_test_val_split(tet = (0.8, 0.2), os_train = False)
         >>> X_train.shape 
-        (8, 80)
+        (8, 60)
         >>> X_test.shape
-        (2, 80)
+        (2, 60)
         >>> len(y_train)
         8
         >>> len(y_test)
@@ -242,11 +242,11 @@ class ML_prep:
         >>> X_train, y_train, X_test, y_test, X_val, y_val = mlp.train_test_val_split(tet = (0.625, 0.250, 0.125))
         >>> X_train, y_train, X_test, y_test, X_val, y_val = mlp.train_test_val_split(tet = (0.6, 0.2, 0.2), os_train = False)
         >>> X_train.shape
-        (6, 80)
+        (6, 60)
         >>> X_test.shape
-        (2, 80)
+        (2, 60)
         >>> X_val.shape
-        (2, 80)
+        (2, 60)
         >>> len(y_train)
         6
         >>> len(y_test)
