@@ -29,7 +29,7 @@ from SNDB import Spectra, Objects
 # login credentials of MySQL database
 import db_params as dbp
 
-def main(query = None, n_min = 50, n_bins = 1024, regions = 16, r_regions = 4, tet = (0.8, 0.2), norm = True, base_dir = dbp.base_dir, rs = 100):
+def main(query = None, n_min = 50, n_bins = 1000, regions = 20, r_regions = 5, tet = (0.8, 0.2), norm = True, base_dir = dbp.base_dir, rs = 100):
     '''
     provides top level execution of final project
         retrieves spectral metadata (either from database query or from saved database query results)
@@ -45,7 +45,9 @@ def main(query = None, n_min = 50, n_bins = 1024, regions = 16, r_regions = 4, t
                                                   (NB: if None, query results should be stored in checkpoints/query_results.pkl)
     n_min (optional, int) : minimum number of examples of a given subtype for it be included in classifier training
     n_bins (optional, int) : number of bins in new wavelength scale
-    n_regions (optional, int) : number of regions to break each spectrum into for integrating
+    regions (optional, int) : number of regions to break each spectrum into for integrating
+                                (NB: dividing this into n_bins from the Spectrum class should result in an integer)
+    r_regions (optional, int) : number of regions to break each spectrum into for computing ratios of integrated areas
                                 (NB: dividing this into n_bins from the Spectrum class should result in an integer)
     tet (optional, tuple) : 2 (or 3) element tuple containing the proportions to select for training, testing(, validation) 
     norm (optional, bool) : selects whether to normalize data based on training set

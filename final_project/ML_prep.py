@@ -29,7 +29,7 @@ class ML_prep:
     os_balance : makes number of occurrences of each label (and associated features) the same by oversampling
     '''
 
-    def __init__(self, spectra, labels, regions = 16, r_regions = 5, rs = 100):
+    def __init__(self, spectra, labels, regions = 20, r_regions = 5, rs = 100):
         '''
         instantiation instructions
 
@@ -39,6 +39,8 @@ class ML_prep:
         spectra : 2d array where each row corresponds to the flux of a given spectrum
         labels : array of subtypes corresponding to the SNe in the rows of spectra
         regions (optional, int) : number of regions to break each spectrum into for integrating
+                                    (NB: dividing this into n_bins from the Spectrum class should result in an integer)
+        r_regions (optional, int) : number of regions to break each spectrum into for computing ratios of integrated areas
                                     (NB: dividing this into n_bins from the Spectrum class should result in an integer)
         rs : random state
 
@@ -69,7 +71,7 @@ class ML_prep:
 
         np.random.seed(rs)
 
-    def integ_reg_area(spectra, regions = 16):
+    def integ_reg_area(spectra, regions = 20):
         '''
         breaks each spectrum into regions and calculates (and returns) the integrated area of each region
 
@@ -77,6 +79,7 @@ class ML_prep:
         ----------
         spectra : 2d array where each row corresponds to the flux of a given spectrum
         regions (optional, int) : number of regions to break each spectrum into for integrating
+                                  (NB: dividing this into n_bins from the Spectrum class should result in an integer)
 
         Returns
         -------
@@ -94,7 +97,7 @@ class ML_prep:
         sections = np.split(spectra, regions, axis = 1)
         return simps(sections, axis = 2).T
 
-    def featurize(self, regions = 16, r_regions = 4):
+    def featurize(self, regions = 20, r_regions = 5):
         '''
         featurizes spectra for ingestion by ML models
             features are integrated areas of regions of each spectrum, the flux at midpoint of each region
@@ -105,6 +108,9 @@ class ML_prep:
         ----------
         (object instance)
         regions (optional, int) : number of regions to break each spectrum into for integrating
+                                  (NB: dividing this into n_bins from the Spectrum class should result in an integer)
+        r_regions (optional, int) : number of regions to break each spectrum into for computing ratios of integrated areas
+                                    (NB: dividing this into n_bins from the Spectrum class should result in an integer)
 
         Returns
         -------

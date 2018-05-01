@@ -150,7 +150,7 @@ class Spectrum:
         flux = medfilt(spec[:,1], ksize)
         return np.array([spec[:,0], flux]).T
 
-    def log_bin(spec, wav_min = 3100, wav_max = 9600, n_bins = 1024):
+    def log_bin(spec, wav_min = 3100, wav_max = 9600, n_bins = 1000):
         '''
         bins spectrum to logarithmic scale and returns re-binned spectrum
             flux re-binning utilizes a cubic spline interpolation
@@ -282,7 +282,7 @@ class Spectrum:
         nflux = (f - f.min()) / (f.max() - f.min())
         return np.array([spec[:,0], nflux - nflux.mean()]).T
 
-    def preprocess(self, ksize = 15, n_spline_pts = 13, wav_min = 3100, wav_max = 9600, n_bins = 1024, end_pct = 0.05):
+    def preprocess(self, ksize = 15, n_spline_pts = 13, wav_min = 3100, wav_max = 9600, n_bins = 1000, end_pct = 0.05):
         '''
         performs preprocessing procedure on instance's spectrum:
             de-redshifts, median filters, removes pseudo continuum, normalizes, apodizes edges, bins to logarithmic wavelength bins
