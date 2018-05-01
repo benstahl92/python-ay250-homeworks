@@ -172,8 +172,7 @@ def main(query = None, n_min = 50, n_bins = 1024, n_regions = 16, tet = (0.8, 0.
 
     # do a grid search with a random forest algorithm and k fold cross-validation to identify the best hyper parameters
     est = RandomForestClassifier()
-    param_grid = {'n_estimators': np.arange(25, 150, 25), 'max_depth': np.arange(2, 12, 2),
-                  'min_samples_split': np.arange(2, 12, 2), 'max_features': np.arange(2, 32, 6), 'min_samples_leaf': np.arange(2, 12, 2)}
+    param_grid = {'n_estimators': [50, 75, 100], 'max_depth': [8, 10, 12], 'min_samples_split': [2, 4, 6], 'min_samples_leaf': [2, 4, 6]}
     print('\ncommencing Random Forest grid search over the following parameter grid:')
     print(param_grid)
     gs_rf = GridSearchCV(est, param_grid, n_jobs = -1, cv = cv)
@@ -195,4 +194,4 @@ if __name__ == "__main__":
     query = s.query(Spectra, Objects).filter(Spectra.ObjID == Objects.ObjID).filter(Objects.Redshift_Gal >= 0).filter(
           Spectra.SNID_Subtype != 'NULL').filter(Spectra.Min < 4500).filter(Spectra.Max > 7000).filter(
           ~Spectra.SNID_Subtype.like('%,%')).filter(Spectra.SNID_Subtype.like('I%'))
-    main(query = query)
+    main()
