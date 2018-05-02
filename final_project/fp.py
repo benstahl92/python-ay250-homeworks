@@ -28,7 +28,10 @@ import SNDB
 from SNDB import Spectra, Objects
 
 # login credentials of MySQL database
-import db_params as dbp
+try:
+    import db_params as dbp
+except ImportError:
+    print('***No params file detected***')
 
 def main(query = None, n_min = 30, n_bins = 1024, regions = 16, r_regions = 8, tet = (0.8, 0.2), norm = True, base_dir = dbp.base_dir, rs = 100):
     '''
