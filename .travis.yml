@@ -2,8 +2,8 @@ language: python
 python:
   - "3.6"
 before_install:
-  - pip install --user pytest pytest-cov
-  - pip install --user pandas numpy astropy tqdm sklearn scipy sqlalchemy
+  - pip install pytest pytest-cov
+  - pip install pandas numpy astropy tqdm sklearn scipy sqlalchemy
 script:
   - cd final_project
   - py.test . --doctest-modules --cov-report term --cov=. -v
