@@ -16,6 +16,7 @@ from tqdm import tqdm
 from sklearn.dummy import DummyClassifier
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.ensemble import RandomForestClassifier
+from sklearn.svm import LinearSVC
 from sklearn.model_selection import GridSearchCV
 from sklearn.model_selection import KFold
 from sklearn.metrics import accuracy_score
@@ -29,7 +30,7 @@ from SNDB import Spectra, Objects
 # login credentials of MySQL database
 import db_params as dbp
 
-def main(query = None, n_min = 50, n_bins = 1024, regions = 16, r_regions = 8, tet = (0.8, 0.2), norm = True, base_dir = dbp.base_dir, rs = 100):
+def main(query = None, n_min = 30, n_bins = 1024, regions = 16, r_regions = 8, tet = (0.8, 0.2), norm = True, base_dir = dbp.base_dir, rs = 100):
     '''
     provides top level execution of final project
         retrieves spectral metadata (either from database query or from saved database query results)
@@ -159,11 +160,25 @@ def main(query = None, n_min = 50, n_bins = 1024, regions = 16, r_regions = 8, t
     dc.fit(X_train, y_train)
     baseline = dc.score(X_test, y_test)
     print('baseline accuracy: {:.3f}'.format(baseline))
-    
+
+    # try several ML approaches based on sklearn's classifier selection flowchart
+
+    # do a grid search a Linear SVC algorithm and k fold cross-validation to identify the best hyper parameters
+    est = LinearSVC()
+    cv = KFold(n_splits = 6, random_state = rs)
+    param_grid = {'tol': [1e-2, 1e-3, 1e-4], 'C': [0.5, 1, 2, 3]}
+    print('\ncommencing Linear SVC grid search over the following parameter grid:')
+    print(param_grid)
+    gs_SVC = GridSearchCV(est, param_grid, n_jobs = -1, cv = cv)
+    gs_SVC.fit(X_train, y_train)
+    print('done --- best parameters (score: {:.3f}):'.format(gs_SVC.best_score_))
+    print(gs_SVC.best_params_)
+    print('accuracy: {:.3f}'.format(gs_SVC.score(X_test, y_test)))
+    print('number of distinct classes (predicted, true): ({}, {})'.format(len(np.unique(gs_SVC.predict(X_test))), len(np.unique(y_test))))
+
     # do a grid search with a k nearest neighbors algorithm and k fold cross-validation to identify the best hyper parameters
     est = KNeighborsClassifier()
-    cv = KFold(n_splits = 6, random_state = rs)
-    param_grid = {'n_neighbors': [3, 9, 15, 21], 'weights': ['uniform', 'distance'], 'leaf_size': [10, 15, 20, 25, 30]}
+    param_grid = {'n_neighbors': [3, 9, 15, 21], 'weights': ['uniform', 'distance'], 'leaf_size': [2, 3, 4, 5]}
     print('\ncommencing KNN grid search over the following parameter grid:')
     print(param_grid)
     gs_knn = GridSearchCV(est, param_grid, n_jobs = -1, cv = cv)
@@ -171,10 +186,11 @@ def main(query = None, n_min = 50, n_bins = 1024, regions = 16, r_regions = 8, t
     print('done --- best parameters (score: {:.3f}):'.format(gs_knn.best_score_))
     print(gs_knn.best_params_)
     print('accuracy: {:.3f}'.format(gs_knn.score(X_test, y_test)))
+    print('number of distinct classes (predicted, true): ({}, {})'.format(len(np.unique(gs_knn.predict(X_test))), len(np.unique(y_test))))
 
     # do a grid search with a random forest algorithm and k fold cross-validation to identify the best hyper parameters
     est = RandomForestClassifier()
-    param_grid = {'n_estimators': [50, 75, 100], 'max_depth': [8, 10, 12], 'min_samples_split': [2, 4, 6], 'min_samples_leaf': [2, 4, 6]}
+    param_grid = {'n_estimators': [25, 50, 75, 100], 'max_depth': [12, 15, 18, 21], 'min_samples_split': [3, 6, 9], 'min_samples_leaf': [2, 5, 8]}
     print('\ncommencing Random Forest grid search over the following parameter grid:')
     print(param_grid)
     gs_rf = GridSearchCV(est, param_grid, n_jobs = -1, cv = cv)
@@ -182,9 +198,10 @@ def main(query = None, n_min = 50, n_bins = 1024, regions = 16, r_regions = 8, t
     print('done --- best parameters (score: {:.3f}):'.format(gs_rf.best_score_))
     print(gs_rf.best_params_)
     print('accuracy: {:.3f}'.format(gs_rf.score(X_test, y_test)))
+    print('number of distinct classes (predicted, true): ({}, {})'.format(len(np.unique(gs_rf.predict(X_test))), len(np.unique(y_test))))
 
-    # save best model, X_scaler, and baseline for future reference
-    best_mod = {'knn': gs_knn.best_estimator_, 'rf': gs_rf.best_estimator_, 'X_scaler': mlp.X_scaler, 'baseline': baseline}
+    # save best models, X_scaler, and baseline for future reference
+    best_mod = {'SVC': gs_SVC.best_estimator_, 'knn': gs_knn.best_estimator_, 'rf': gs_rf.best_estimator_, 'X_scaler': mlp.X_scaler, 'baseline': baseline}
     with open(best_mod_fl, 'wb') as f:
         pkl.dump(best_mod, f)
     print('\nbest model written to file: {}'.format(best_mod_fl))
@@ -195,5 +212,5 @@ if __name__ == "__main__":
     s = SNDB.get_session(dbp.usr, dbp.pswd, dbp.host, dbp.db)
     query = s.query(Spectra, Objects).filter(Spectra.ObjID == Objects.ObjID).filter(Objects.Redshift_Gal >= 0).filter(
           Spectra.SNID_Subtype != 'NULL').filter(Spectra.Min < 4500).filter(Spectra.Max > 7000).filter(
-          ~Spectra.SNID_Subtype.like('%,%')).filter(Spectra.SNID_Subtype.like('I%')).limit(10)
-    main(query = query, n_min = None)
+          ~Spectra.SNID_Subtype.like('%,%')).filter(Spectra.SNID_Subtype.like('I%')).filter(Spectra.SNR > 15)
+    main()
