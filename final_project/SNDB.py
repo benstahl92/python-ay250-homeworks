@@ -18,6 +18,7 @@ class Spectra(Base):
     SNID_Subtype = Column(String)
     Min = Column(String)
     Max = Column(String)
+    SNR = Column(Float)
 
 class Objects(Base):
     '''
