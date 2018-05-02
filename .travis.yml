@@ -1,5 +1,5 @@
 language: python
-  - "3.5"
+  - "3.6"
 before_install:
   - pip install --user pytest pytest-cov
   - pip install --user pandas numpy astropy tqdm sklearn scipy sqlalchemy
