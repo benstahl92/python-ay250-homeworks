@@ -1,6 +1,7 @@
 language: python
   - "3.5"
 before_install:
+  - pip install --upgrade pip
   - pip install pytest pytest-cov
 script:
   - cd final_project
