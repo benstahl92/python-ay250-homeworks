@@ -1,2 +1,2 @@
 # Final Project for Spring 2018 UC Berkeley Astro 250 Course
-[![Build Status](https://travis-ci.org/benstahl92/python-ay250-homeworks.svg?branch=master)](https://travis-ci.org/benstahl92/python-ay250-homeworks)
+[![Build Status](https://travis-ci.org/benstahl92/python-ay250-homeworks.svg?branch=master)](https://travis-ci.org/benstahl92/python-ay250-homeworks) [![Coverage Status](https://coveralls.io/repos/github/benstahl92/python-ay250-homeworks/badge.svg?branch=master)](https://coveralls.io/github/benstahl92/python-ay250-homeworks?branch=master)
