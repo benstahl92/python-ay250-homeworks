@@ -30,10 +30,12 @@ from SNDB import Spectra, Objects
 # login credentials of MySQL database
 try:
     import db_params as dbp
+    base_dir = dbp.base_dir
 except ImportError:
     print('***No params file detected***')
+    base_dir = 'dummy'
 
-def main(query = None, n_min = 30, n_bins = 1024, regions = 16, r_regions = 8, tet = (0.8, 0.2), norm = True, base_dir = dbp.base_dir, rs = 100):
+def main(query = None, n_min = 30, n_bins = 1024, regions = 16, r_regions = 8, tet = (0.8, 0.2), norm = True, base_dir = base_dir, rs = 100):
     '''
     provides top level execution of final project
         retrieves spectral metadata (either from database query or from saved database query results)
