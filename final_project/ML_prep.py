@@ -45,16 +45,16 @@ class ML_prep:
 
         Doctests/Examples
         -----------------
-        >>> s = Spectrum('SN 1997y', 'Ia-norm', 'test_files/sn1997y-19970209-uohp.flm', 0.01587, 44.2219)
+        >>> s = Spectrum('SN 1997y', 'Ia-norm', 'test/sn1997y-19970209-uohp.flm', 0.01587, 44.2219)
         >>> mlp = ML_prep(s.preprocess()[:,1].reshape(1,-1), np.array([s.type]), regions = 16, r_regions = 8)
         >>> mlp.X.shape
         (1, 60)
-        >>> data = np.load('test_files/proc_test.npz')
+        >>> data = np.load('test/proc.npz')
         >>> mlp = ML_prep(data['arr_0'], data['arr_1'], regions = 16, r_regions = 8)
         >>> mlp.spectra.shape[0] == len(mlp.labels)
         True
         >>> mlp.X.shape
-        (10, 60)
+        (25, 60)
         '''
 
         # full (un-prepared) sets
@@ -86,10 +86,10 @@ class ML_prep:
 
         Doctests/Examples
         -----------------
-        >>> data = np.load('test_files/proc_test.npz')
+        >>> data = np.load('test/proc.npz')
         >>> mlp = ML_prep(data['arr_0'], data['arr_1'], regions = 16)
         >>> ML_prep.integ_reg_area(mlp.spectra, regions = 16).shape
-        (10, 16)
+        (25, 16)
         '''
 
         # split spectra into regions then integrate each of those regions
@@ -117,10 +117,10 @@ class ML_prep:
 
         Doctests/Examples
         -----------------
-        >>> data = np.load('test_files/proc_test.npz')
+        >>> data = np.load('test/proc.npz')
         >>> mlp = ML_prep(data['arr_0'], data['arr_1'], regions = 16, r_regions = 8)
         >>> mlp.featurize(regions = 16, r_regions = 8).shape
-        (10, 60)
+        (25, 60)
         '''
 
         # create container for features and then populate
@@ -157,9 +157,9 @@ class ML_prep:
 
         Doctests/Examples
         -----------------
-        >>> data = np.load('test_files/proc_test.npz')
+        >>> data = np.load('test/proc.npz')
         >>> mlp = ML_prep(data['arr_0'], data['arr_1'], regions = 16, r_regions = 8)
-        >>> len(mlp.labels) == 10
+        >>> len(mlp.labels) == 25
         True
         '''
 
@@ -179,10 +179,10 @@ class ML_prep:
 
         Doctests/Examples
         -----------------
-        >>> data = np.load('test_files/proc_test.npz')
+        >>> data = np.load('test/proc.npz')
         >>> mlp = ML_prep(data['arr_0'], data['arr_1'], regions = 16, r_regions = 8)
         >>> len(ML_prep.os_balance(mlp.labels))
-        16
+        63
         '''
 
         # get unique labels and their counts
@@ -203,9 +203,6 @@ class ML_prep:
             elif cnt < mc:
                 sample_indices = li[labels == uniques[idx]]
                 osi[(idx * mc):((idx + 1) * mc)] = np.random.choice(sample_indices, size = mc) # with replacement
-            elif cnt > mc:
-                raise ValueError('label {} has max count ({}) greater than label with calculated max count ({})'.format(
-                                  uniques[idx], counts[idx], mc))
 
         # return (shuffled) oversample indices
         return np.random.choice(osi, size = len(osi), replace = False)
@@ -226,32 +223,40 @@ class ML_prep:
         -------
         splitting : list of length 4 (or 6) containing the splits of training, testing(, validation) data (each split is X, y)
 
-        >>> data = np.load('test_files/proc_test.npz')
+        Doctests/Examples
+        -----------------
+        >>> data = np.load('test/proc.npz')
+        >>> import sklearn
+        >>> sklearn.set_config(assume_finite = True) # optimize for speed
         >>> mlp = ML_prep(data['arr_0'], data['arr_1'], regions = 16, r_regions = 8)
-        >>> X_train, y_train, X_test, y_test = mlp.train_test_val_split(tet = (0.625, 0.375))
+        >>> X_train, y_train, X_test, y_test = mlp.train_test_val_split(tet = (0.8, 0.2))
         >>> X_train, y_train, X_test, y_test = mlp.train_test_val_split(tet = (0.8, 0.2), os_train = False)
         >>> X_train.shape 
-        (8, 60)
+        (20, 60)
         >>> X_test.shape
-        (2, 60)
+        (5, 60)
         >>> len(y_train)
-        8
+        20
         >>> len(y_test)
-        2
+        5
         >>> X_train, y_train, X_test, y_test, X_val, y_val = mlp.train_test_val_split(tet = (0.625, 0.250, 0.125))
         >>> X_train, y_train, X_test, y_test, X_val, y_val = mlp.train_test_val_split(tet = (0.6, 0.2, 0.2), os_train = False)
         >>> X_train.shape
-        (6, 60)
+        (15, 60)
         >>> X_test.shape
-        (2, 60)
+        (5, 60)
         >>> X_val.shape
-        (2, 60)
+        (5, 60)
         >>> len(y_train)
-        6
+        15
         >>> len(y_test)
-        2
+        5
         >>> len(y_val)
-        2
+        5
+        >>> X_train, y_train, X_test, y_test = mlp.train_test_val_split(tet = (0.25, 0.25, 0.25, 0.25))
+        Traceback (most recent call last):
+        ...
+        ValueError: tet is not length 2 or 3
         '''
 
         assert np.sum(tet) == 1
@@ -265,11 +270,8 @@ class ML_prep:
         y_train = self.y[shuff_ind[:int(tet[0]*dlen)]]
         if os_train:
             train_ind = ML_prep.os_balance(y_train)
-            X_train = X_train[train_ind]
+            X_train = X_train[train_ind, :]
             y_train = y_train[train_ind]
-            #c, u = np.unique(y_train, return_counts=True)
-        #elif not os_train:
-        #    X_train = self.X[shuff_ind[:int(tet[0]*dlen)],:]
 
         # fit scaler to training data
         self.X_scaler.fit(X_train)
