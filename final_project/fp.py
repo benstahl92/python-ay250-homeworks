@@ -35,7 +35,8 @@ except ImportError:
     print('***No params file detected***')
     base_dir = 'dummy'
 
-def main(query = None, n_min = 30, n_bins = 1024, regions = 16, r_regions = 8, tet = (0.8, 0.2), norm = True, base_dir = base_dir, rs = 100, test_mode = False):
+def main(query = None, n_min = 30, n_bins = 1024, regions = 16, r_regions = 8, tet = (0.8, 0.2), norm = True, base_dir = base_dir,
+         rs = 100, test_mode = False, verbose = True):
     '''
     provides top level execution of final project
         retrieves spectral metadata (either from database query or from saved database query results)
@@ -44,8 +45,8 @@ def main(query = None, n_min = 30, n_bins = 1024, regions = 16, r_regions = 8, t
         trains ML classifiers, computes success metrics, saves results to file
 
     Most examples and doctests can be found in the docstrings of all functions and classes used by this function
-    >>> r = main(query = None, n_min = None, test_mode = True) is None
-    >>> r
+    >>> main(query = None, n_min = None, test_mode = True, verbose = False) is None
+    True
 
     Parameters
     ----------
@@ -62,6 +63,7 @@ def main(query = None, n_min = 30, n_bins = 1024, regions = 16, r_regions = 8, t
     base_dir (optional, str) : base path that all spectra filepaths are relative to
     rs (optional, int) : seed for random state
     test_mode (optional, bool) : selects whether to run in testing mode
+    verbose : (optional, bool) : selects whether or not to print on screen
 
     Outputs
     -------
@@ -82,38 +84,44 @@ def main(query = None, n_min = 30, n_bins = 1024, regions = 16, r_regions = 8, t
     feat_fl = checkpoints_dir + 'feat.npz'
     best_mod_fl = 'best_mod.pkl'
 
-    print('\nWelcome to the Supernova Type Classifier Builder!\n')
+    if verbose:
+        print('\nWelcome to the Supernova Type Classifier Builder!\n')
 
     ########################################## data acquisition ##########################################
 
     # if no query has been passed and a results file exists, read from that
     if (query is None) and os.path.isfile(query_res_fl):
-        print('reading from query results file...')
+        if verbose:
+            print('reading from query results file...')
         with open(query_res_fl, 'rb') as f:
             results = pkl.load(f)
 
     # otherwise, execute query against database, retrieve results, and write to disk for later use
     else:
-        print('querying database...')
+        if verbose:
+            print('querying database...')
         results = query.all()
         with open(query_fl, 'w') as f:
             f.write(str(query))
         with open(query_res_fl, 'wb') as f:
             pkl.dump(results, f)
-        print('done --- results written to {}'.format(query_res_fl))
+        if verbose:
+            print('done --- results written to {}'.format(query_res_fl))
 
     ######################################### data preprocessing #########################################
 
     # if no query has been passed and processed file exists, read from that
     if (query is None) and os.path.isfile(proc_fl):
-        print('\nreading preprocessed spectra and labels from file...')
+        if verbose:
+            print('\nreading preprocessed spectra and labels from file...')
         data = np.load(proc_fl)
         pr_spectra = data['arr_0']
         labels = data['arr_1']
 
     # otherwise load, preprocess, and store all spectra and labels from results
     else:
-        print('\nloading and preprocessing {} spectra and labels...'.format(len(results)))
+        if verbose:
+            print('\nloading and preprocessing {} spectra and labels...'.format(len(results)))
         pr_spectra = np.zeros((len(results), n_bins))
         labels = np.zeros(len(results), dtype=object)
         keep_ind = [] # to hold indices where process succeeds
@@ -133,19 +141,22 @@ def main(query = None, n_min = 30, n_bins = 1024, regions = 16, r_regions = 8, t
         pr_spectra = pr_spectra[keep_ind, :]
         labels = labels[keep_ind]
         np.savez(proc_fl, pr_spectra, labels)
-        print('done --- results written to {}'.format(proc_fl))
+        if verbose:
+            print('done --- results written to {}'.format(proc_fl))
 
     # display summary statistics of sample
-    s = pd.Series(labels)
-    print('\ndistribution of types in selected sample:')
-    print(s.value_counts().sort_index())
+    if verbose:
+        s = pd.Series(labels)
+        print('\ndistribution of types in selected sample:')
+        print(s.value_counts().sort_index())
 
     # optionally remove classes with few than n_min examples
     if n_min is not None:
         uniqs, cnts = np.unique(labels, return_counts = True)
         to_remove = uniqs[cnts < n_min]
         if len(to_remove) > 0:
-            print('\nremoving classes with fewer than {} occurences'.format(n_min))
+            if verbose:
+                print('\nremoving classes with fewer than {} occurences'.format(n_min))
             for rem in to_remove:
                 rem_indices = np.where(labels == rem)
                 pr_spectra = np.delete(pr_spectra, rem_indices, 0)
@@ -154,11 +165,13 @@ def main(query = None, n_min = 30, n_bins = 1024, regions = 16, r_regions = 8, t
     ######################################### machine learning #########################################
 
     # extract features and split into training and testing sets
-    print('\nfeaturizing data and extracting training and testing sets with oversampling...')
+    if verbose:
+        print('\nfeaturizing data and extracting training and testing sets with oversampling...')
     mlp = ML_prep(pr_spectra, labels, regions = regions, r_regions = r_regions)
     X_train, y_train, X_test, y_test = mlp.train_test_val_split(tet = tet)
     np.savez(feat_fl, X_train, y_train, X_test, y_test)
-    print('done --- results written to {}'.format(feat_fl))
+    if verbose:
+        print('done --- results written to {}'.format(feat_fl))
 
     # normalize based on training data (optionally)
     if norm:
@@ -166,11 +179,13 @@ def main(query = None, n_min = 30, n_bins = 1024, regions = 16, r_regions = 8, t
         X_test = mlp.X_scaler.transform(X_test)
 
     # compute baseline accuracy using the most most frequent type as baseline
-    print('\ncomputing baseline accuracy for {} classes'.format(len(np.unique(y_train))))
+    if verbose:
+        print('\ncomputing baseline accuracy for {} classes'.format(len(np.unique(y_train))))
     dc = DummyClassifier(strategy = 'constant', constant = s.value_counts().index[0])
     dc.fit(X_train, y_train)
     baseline = dc.score(X_test, y_test)
-    print('baseline accuracy: {:.3f}'.format(baseline))
+    if verbose:
+        print('baseline accuracy: {:.3f}'.format(baseline))
 
     # try several ML approaches based on sklearn's classifier selection flowchart
 
@@ -184,45 +199,56 @@ def main(query = None, n_min = 30, n_bins = 1024, regions = 16, r_regions = 8, t
     param_grid = {'tol': [1e-2, 1e-3, 1e-4], 'C': [0.5, 1, 2, 3]}
     if test_mode:
         param_grid = {'tol': [1e-3], 'C': [1]} # optimize for speed
-    print('\ncommencing Linear SVC grid search over the following parameter grid:')
-    print(param_grid)
+    if verbose:
+        print('\ncommencing Linear SVC grid search over the following parameter grid:')
+        print(param_grid)
     gs_SVC = GridSearchCV(est, param_grid, n_jobs = -1, cv = cv)
     gs_SVC.fit(X_train, y_train)
-    print('done --- best parameters (score: {:.3f}):'.format(gs_SVC.best_score_))
-    print(gs_SVC.best_params_)
-    print('accuracy: {:.3f}'.format(gs_SVC.score(X_test, y_test)))
-    print('number of distinct classes (predicted, true): ({}, {})'.format(len(np.unique(gs_SVC.predict(X_test))), len(np.unique(y_test))))
+    if verbose:
+        print('done --- best parameters (score: {:.3f}):'.format(gs_SVC.best_score_))
+        print(gs_SVC.best_params_)
+        print('accuracy: {:.3f}'.format(gs_SVC.score(X_test, y_test)))
+        print('number of distinct classes (predicted, true): ({}, {})'.format(len(np.unique(gs_SVC.predict(X_test))), len(np.unique(y_test))))
 
     # do a grid search with a k nearest neighbors algorithm and k fold cross-validation to identify the best hyper parameters
     est = KNeighborsClassifier()
     param_grid = {'n_neighbors': [3, 9, 15, 21], 'weights': ['uniform', 'distance'], 'leaf_size': [2, 3, 4, 5]}
-    print('\ncommencing KNN grid search over the following parameter grid:')
-    print(param_grid)
+    if test_mode:
+        param_grid = {'n_neighbors': [3], 'leaf_size': [5]} # optimize for speed
+    if verbose:
+        print('\ncommencing KNN grid search over the following parameter grid:')
+        print(param_grid)
     gs_knn = GridSearchCV(est, param_grid, n_jobs = -1, cv = cv)
     gs_knn.fit(X_train, y_train)
-    print('done --- best parameters (score: {:.3f}):'.format(gs_knn.best_score_))
-    print(gs_knn.best_params_)
-    print('accuracy: {:.3f}'.format(gs_knn.score(X_test, y_test)))
-    print('number of distinct classes (predicted, true): ({}, {})'.format(len(np.unique(gs_knn.predict(X_test))), len(np.unique(y_test))))
+    if verbose:
+        print('done --- best parameters (score: {:.3f}):'.format(gs_knn.best_score_))
+        print(gs_knn.best_params_)
+        print('accuracy: {:.3f}'.format(gs_knn.score(X_test, y_test)))
+        print('number of distinct classes (predicted, true): ({}, {})'.format(len(np.unique(gs_knn.predict(X_test))), len(np.unique(y_test))))
 
     # do a grid search with a random forest algorithm and k fold cross-validation to identify the best hyper parameters
     est = RandomForestClassifier()
     param_grid = {'n_estimators': [25, 50, 75, 100], 'max_depth': [12, 15, 18, 21], 'min_samples_split': [3, 6, 9], 'min_samples_leaf': [2, 5, 8]}
-    print('\ncommencing Random Forest grid search over the following parameter grid:')
-    print(param_grid)
+    if test_mode:
+        param_grid = {'n_estimators': [25], 'max_depth': [12], 'min_samples_split': [3], 'min_samples_leaf': [2]} # optimize for speed
+    if verbose:
+        print('\ncommencing Random Forest grid search over the following parameter grid:')
+        print(param_grid)
     gs_rf = GridSearchCV(est, param_grid, n_jobs = -1, cv = cv)
     gs_rf.fit(X_train, y_train)
-    print('done --- best parameters (score: {:.3f}):'.format(gs_rf.best_score_))
-    print(gs_rf.best_params_)
-    print('accuracy: {:.3f}'.format(gs_rf.score(X_test, y_test)))
-    print('number of distinct classes (predicted, true): ({}, {})'.format(len(np.unique(gs_rf.predict(X_test))), len(np.unique(y_test))))
+    if verbose:
+        print('done --- best parameters (score: {:.3f}):'.format(gs_rf.best_score_))
+        print(gs_rf.best_params_)
+        print('accuracy: {:.3f}'.format(gs_rf.score(X_test, y_test)))
+        print('number of distinct classes (predicted, true): ({}, {})'.format(len(np.unique(gs_rf.predict(X_test))), len(np.unique(y_test))))
 
     # save best models, X_scaler, and baseline for future reference
     if not test_mode:
         best_mod = {'SVC': gs_SVC.best_estimator_, 'knn': gs_knn.best_estimator_, 'rf': gs_rf.best_estimator_, 'X_scaler': mlp.X_scaler, 'baseline': baseline}
         with open(best_mod_fl, 'wb') as f:
             pkl.dump(best_mod, f)
-        print('\nbest model written to file: {}'.format(best_mod_fl))
+        if verbose:
+            print('\nbest model written to file: {}'.format(best_mod_fl))
     
     return None
 
