@@ -8,8 +8,7 @@ from scipy.signal import medfilt
 class Spectrum:
     '''
     base class for spectra that provides a self-contained pathway from metadata to various data products
-        class contains methods for direct use by class instances and functions that can be exposed outside of a specific instance
-        for examples/doctests see docstrings for the methods and functions of the class
+        includes methods for direct use by instances and functions that can be exposed outside of a specific instance
 
     General Concepts
     ----------------
@@ -123,7 +122,7 @@ class Spectrum:
         wav = spec[:,0] / (1 + z)
         return np.array([wav, spec[:,1]]).T
 
-    def sp_medfilt(spec, ksize = 15):
+    def sp_medfilt(spec, ksize = 13):
         '''
         wrapper around scipy medfilt function
             applies a median filter (and returns) spectrum

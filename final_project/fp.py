@@ -27,7 +27,7 @@ from ML_prep import ML_prep
 import SNDB
 from SNDB import Spectra, Objects
 
-# login credentials of MySQL database
+# login credentials of MySQL database (handle errors when doing testing w/o credentials)
 try:
     import db_params as dbp
     base_dir = dbp.base_dir
@@ -47,12 +47,12 @@ def main(query = None, n_min = 30, n_bins = 1024, regions = 16, r_regions = 8, t
 
     Parameters
     ----------
-    query (optional, sqlalchemy query instance) : sqlalchemy query instance through which data is pulled from SNDB
+    query (optional, sqlalchemy query instance) : sqlalchemy query instance through which data is pulled from database
                                                   (NB: if None, query results should be stored in checkpoints/query_results.pkl)
     n_min (optional, int) : minimum number of examples of a given subtype for it be included in classifier training
-    n_bins (optional, int) : number of bins in new wavelength scale
-    regions (optional, int) : number of regions to break each spectrum into for integrating
-                                (NB: dividing this into n_bins from the Spectrum class should result in an integer)
+    n_bins (optional, int) : number of bins in common wavelength scale
+    regions (optional, int) : number of regions to break each spectrum into for integrating areas and selecting midpoints
+                              (NB: dividing this into n_bins from the Spectrum class should result in an integer)
     r_regions (optional, int) : number of regions to break each spectrum into for computing ratios of integrated areas
                                 (NB: dividing this into n_bins from the Spectrum class should result in an integer)
     tet (optional, tuple) : 2 (or 3) element tuple containing the proportions to select for training, testing(, validation) 
@@ -63,13 +63,13 @@ def main(query = None, n_min = 30, n_bins = 1024, regions = 16, r_regions = 8, t
     Outputs
     -------
     'checkpoints/query_results.pkl' : pkl file containing query results (no need to duplicate db interactions if query doesn't change)
-    'checkpoints/query.txt' : plain text SQL query corresponding to contents of 'checkpoints/query_results.pkl'
+    'checkpoints/query.txt' : plain text SQL query executed to retrieve contents of 'checkpoints/query_results.pkl'
     'checkpoints/proc.npz' : file containing two arrays (preprocessed spectra and labels), so no need to re-preprocess on the same data
     'checkpoints/feat.npz' : file containing four arrays (X_train, y_train, X_test, y_test)
     'best_mod.pkl' : pkl file containing a dictionary with ML results (best models, baseline, X_scaler)
     '''
 
-    # global filenames for storage
+    # filenames for storage
     query_res_fl = 'checkpoints/query_results.pkl'
     query_fl = 'checkpoints/query.txt'
     proc_fl = 'checkpoints/proc.npz'
@@ -78,7 +78,7 @@ def main(query = None, n_min = 30, n_bins = 1024, regions = 16, r_regions = 8, t
 
     print('\nWelcome to the Supernova Type Classifier Builder!\n')
 
-    ######################################### data acquisition #########################################
+    ########################################## data acquisition ##########################################
 
     # if no query has been passed and a results file exists, read from that
     if (query is None) and os.path.isfile(query_res_fl):
@@ -105,7 +105,7 @@ def main(query = None, n_min = 30, n_bins = 1024, regions = 16, r_regions = 8, t
         pr_spectra = data['arr_0']
         labels = data['arr_1']
 
-    # otherwise, load, preprocess, and store all spectra and labels from results
+    # otherwise load, preprocess, and store all spectra and labels from results
     else:
         print('\nloading and preprocessing {} spectra and labels...'.format(len(results)))
         pr_spectra = np.zeros((len(results), n_bins))
@@ -147,8 +147,8 @@ def main(query = None, n_min = 30, n_bins = 1024, regions = 16, r_regions = 8, t
 
     ######################################### machine learning #########################################
 
-    # extract features and split into test, evaluation, and training sets
-    print('\nfeaturizing data and extracting training, validation, and testing sets with oversampling...')
+    # extract features and split into training and testing sets
+    print('\nfeaturizing data and extracting training and testing sets with oversampling...')
     mlp = ML_prep(pr_spectra, labels, regions = regions, r_regions = r_regions)
     X_train, y_train, X_test, y_test = mlp.train_test_val_split(tet = tet)
     np.savez(feat_fl, X_train, y_train, X_test, y_test)
@@ -159,16 +159,17 @@ def main(query = None, n_min = 30, n_bins = 1024, regions = 16, r_regions = 8, t
         X_train = mlp.X_scaler.transform(X_train)
         X_test = mlp.X_scaler.transform(X_test)
 
-    # compute baseline accuracy (assuming 'Ia-norm' is the most frequent)
-    print('\ncomputing baseline accuracy for {} classes'.format(len(np.unique(y_train))))
-    dc = DummyClassifier(strategy = 'constant', constant = 'Ia-norm')
+    # compute baseline accuracy using the most most frequent type as baseline
+    uniqs, cnts = np.unique(y_train, return_counts = True)
+    print('\ncomputing baseline accuracy for {} classes'.format(len(uniqs)))
+    dc = DummyClassifier(strategy = 'constant', constant = uniqs[np.argmax(cnts)])
     dc.fit(X_train, y_train)
     baseline = dc.score(X_test, y_test)
     print('baseline accuracy: {:.3f}'.format(baseline))
 
     # try several ML approaches based on sklearn's classifier selection flowchart
 
-    # do a grid search a Linear SVC algorithm and k fold cross-validation to identify the best hyper parameters
+    # do a grid search with a Linear SVC algorithm and k fold cross-validation to identify the best hyper parameters
     est = LinearSVC()
     cv = KFold(n_splits = 6, random_state = rs)
     param_grid = {'tol': [1e-2, 1e-3, 1e-4], 'C': [0.5, 1, 2, 3]}
@@ -211,11 +212,16 @@ def main(query = None, n_min = 30, n_bins = 1024, regions = 16, r_regions = 8, t
         pkl.dump(best_mod, f)
     print('\nbest model written to file: {}'.format(best_mod_fl))
 
-# set query and run
+# execution instructions upon typing 'python fp.py' at terminal prompt
 if __name__ == "__main__":
 
+    # get database session
     s = SNDB.get_session(dbp.usr, dbp.pswd, dbp.host, dbp.db)
+
+    # formulate query
     query = s.query(Spectra, Objects).filter(Spectra.ObjID == Objects.ObjID).filter(Objects.Redshift_Gal >= 0).filter(
           Spectra.SNID_Subtype != 'NULL').filter(Spectra.Min < 4500).filter(Spectra.Max > 7000).filter(
           ~Spectra.SNID_Subtype.like('%,%')).filter(Spectra.SNID_Subtype.like('I%')).filter(Spectra.SNR > 15)
+
+    # execute
     main()

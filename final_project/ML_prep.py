@@ -3,30 +3,29 @@ import numpy as np
 from Spectrum import Spectrum
 from sklearn.preprocessing import StandardScaler
 from scipy.integrate import simps
-from scipy.special import factorial
 
 class ML_prep:
     '''
     base class for organizing and preparing data for machine learning processes
-        class contains methods for direct use by class instances and functions that can be exposed outside of a specific instance
-        for examples/doctests see docstrings for the methods and functions of the class
+        includes methods for direct use by instances and functions that can be exposed outside of a specific instance
 
     General Concepts
     ----------------
     takes spectra that have been preprocessed by the Spectrum class and prepares them for ingestion by a ML model
-    features are the integrated areas of different regions of each spectrum
+    features are the integrated areas of different regions of each spectrum, midpoints of these areas,
+        and the ratios of all combinations of the integrated areas of r_regions
 
     Methods
     -------
     __init__ : instantiation instructions
     featurize : featurizes spectra for ingestion by ML models
     proc_labels : do any needed processing on labels before ingestion by ML model (currently trivial)
-    train_val_test_split : splits featurized data and labels into training, evaluation, and testing sets
+    train_test_val_split : splits featurized data and labels into training, testing(, validation) sets
 
     Functions
     ---------
     integ_reg_area : breaks each spectrum into regions and calculates (and returns) the integrated area of each region
-    os_balance : makes number of occurrences of each label (and associated features) the same by oversampling
+    os_balance : makes number of occurrences of each class (and associated features) the same by oversampling
     '''
 
     def __init__(self, spectra, labels, regions = 16, r_regions = 8, rs = 100):
@@ -39,7 +38,7 @@ class ML_prep:
         spectra : 2d array where each row corresponds to the flux of a given spectrum
         labels : array of subtypes corresponding to the SNe in the rows of spectra
         regions (optional, int) : number of regions to break each spectrum into for integrating
-                                    (NB: dividing this into n_bins from the Spectrum class should result in an integer)
+                                  (NB: dividing this into n_bins from the Spectrum class should result in an integer)
         r_regions (optional, int) : number of regions to break each spectrum into for computing ratios of integrated areas
                                     (NB: dividing this into n_bins from the Spectrum class should result in an integer)
         rs : random state
@@ -102,7 +101,7 @@ class ML_prep:
         featurizes spectra for ingestion by ML models
             features are integrated areas of regions of each spectrum, the flux at midpoint of each region
             additional features are extracted by breaking each spectrum into r_regions and computing all 
-                permutations of the ratios of integrated areas
+                combinations of the ratios of integrated areas
 
         Parameters
         ----------
@@ -134,7 +133,7 @@ class ML_prep:
         # integrated area of each region
         features[:, regions:(2*regions)] = ML_prep.integ_reg_area(self.spectra, regions = regions)
 
-        # compute all ratio permutations
+        # compute all ratio combinations
         areas = ML_prep.integ_reg_area(self.spectra, regions = r_regions)
         a_ratios = []
         for i in range(r_regions - 1):
@@ -154,7 +153,7 @@ class ML_prep:
 
         Returns
         -------
-        unmodified labels (trivial, but in the future only this function would need to be modified to adjust this)
+        unmodified labels (trivial, but in the future only this method would need to be modified to adjust this)
 
         Doctests/Examples
         -----------------
@@ -168,7 +167,7 @@ class ML_prep:
 
     def os_balance(labels):
         '''
-        makes number of occurrences of each label (and associated features) the same by oversampling
+        makes number of occurrences of each class (and associated features) the same by oversampling
 
         Parameters
         ----------
@@ -176,7 +175,7 @@ class ML_prep:
 
         Returns
         -------
-        osi : (shuffled) array of indices corresponding to labels that have been oversampled to match the most common label
+        osi : (shuffled) array of indices corresponding to labels that have been oversampled to match the count of the most common label
 
         Doctests/Examples
         -----------------
@@ -221,7 +220,7 @@ class ML_prep:
         ----------
         (object instance)
         tet (optional, tuple) : 2 (or 3) element tuple containing the proportions to select for training, testing(, validation) 
-        os_train (optional, bool) : bool that selects whether training data should be over sampled until class proportions are equal
+        os_train (optional, bool) : selects whether training data should be oversampled until class proportions are equal
 
         Returns
         -------
@@ -268,12 +267,14 @@ class ML_prep:
             train_ind = ML_prep.os_balance(y_train)
             X_train = X_train[train_ind]
             y_train = y_train[train_ind]
-            c, u = np.unique(y_train, return_counts=True)
-        elif not os_train:
-            X_train = self.X[shuff_ind[:int(tet[0]*dlen)],:]
+            #c, u = np.unique(y_train, return_counts=True)
+        #elif not os_train:
+        #    X_train = self.X[shuff_ind[:int(tet[0]*dlen)],:]
+
+        # fit scaler to training data
         self.X_scaler.fit(X_train)
 
-        # construct testing(, validation) sets
+        # construct testing(, validation) sets and return
         X_test = self.X[shuff_ind[int(tet[0]*dlen):int((tet[0]+tet[1])*dlen)],:]
         y_test = self.y[shuff_ind[int(tet[0]*dlen):int((tet[0]+tet[1])*dlen)]]
         if len(tet) == 3:
