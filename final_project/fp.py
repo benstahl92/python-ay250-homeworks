@@ -145,8 +145,8 @@ def main(query = None, n_min = 30, n_bins = 1024, regions = 16, r_regions = 8, t
             print('done --- results written to {}'.format(proc_fl))
 
     # display summary statistics of sample
+    s = pd.Series(labels)
     if verbose:
-        s = pd.Series(labels)
         print('\ndistribution of types in selected sample:')
         print(s.value_counts().sort_index())
 

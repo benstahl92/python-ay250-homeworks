@@ -1,0 +1,4 @@
+SELECT spectra.`SpecID` AS `spectra_SpecID`, spectra.`ObjID` AS `spectra_ObjID`, spectra.`Filename` AS `spectra_Filename`, spectra.`Filepath` AS `spectra_Filepath`, spectra.`SNID_Subtype` AS `spectra_SNID_Subtype`, spectra.`Min` AS `spectra_Min`, spectra.`Max` AS `spectra_Max`, spectra.`SNR` AS `spectra_SNR`, objects.`ObjID` AS `objects_ObjID`, objects.`ObjName` AS `objects_ObjName`, objects.`Redshift_Gal` AS `objects_Redshift_Gal` 
+FROM spectra, objects 
+WHERE spectra.`ObjID` = objects.`ObjID` AND objects.`Redshift_Gal` >= %s AND spectra.`SNID_Subtype` != %s AND spectra.`Min` < %s AND spectra.`Max` > %s AND spectra.`SNID_Subtype` NOT LIKE %s AND spectra.`SNID_Subtype` LIKE %s AND spectra.`SNR` > %s 
+ LIMIT %s
