@@ -11,3 +11,5 @@ The procedure followed by `fp.py` can be summarized as follows:
 * trains ML classifiers, computes success metrics, saves results to file
 
 There is extensive documentation and examples/doctests in the docstrings for all functions and classes.
+
+A video demonstration of the code is available here: [Link](https://www.dropbox.com/s/87adwgi38as880b/demo.mov?dl=0)
