@@ -138,9 +138,8 @@ class ML_prep:
         a_ratios = []
         for i in range(r_regions - 1):
             # set divisions by zero to zero
-            a_ratios.append(np.divide(areas[:, (i+1):],  areas[:, :-(i+1)], where = areas[:, :-(i+1)] != 0))
+            a_ratios.append(np.divide(areas[:, :(-i-1)],  areas[:, (i+1):], out=np.zeros_like(areas[:, :(-i-1)]), where = areas[:, (i+1):] != 0))
         features[:, -r_region_size:] = np.concatenate(a_ratios, axis = 1)
-
         return features
 
     def proc_labels(self):
@@ -184,7 +183,6 @@ class ML_prep:
         >>> len(ML_prep.os_balance(mlp.labels))
         63
         '''
-
         # get unique labels and their counts
         uniques, counts = np.unique(labels, return_counts = True)
 
@@ -275,7 +273,6 @@ class ML_prep:
 
         # fit scaler to training data
         self.X_scaler.fit(X_train)
-
         # construct testing(, validation) sets and return
         X_test = self.X[shuff_ind[int(tet[0]*dlen):int((tet[0]+tet[1])*dlen)],:]
         y_test = self.y[shuff_ind[int(tet[0]*dlen):int((tet[0]+tet[1])*dlen)]]

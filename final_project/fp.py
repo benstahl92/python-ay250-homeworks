@@ -212,7 +212,7 @@ def main(query = None, n_min = 30, n_bins = 1024, regions = 16, r_regions = 8, t
 
     # do a grid search with a k nearest neighbors algorithm and k fold cross-validation to identify the best hyper parameters
     est = KNeighborsClassifier()
-    param_grid = {'n_neighbors': [3, 9, 15, 21], 'weights': ['uniform', 'distance'], 'leaf_size': [2, 3, 4, 5]}
+    param_grid = {'n_neighbors': [3, 9, 15], 'weights': ['uniform', 'distance'], 'leaf_size': [2, 4, 6]}
     if test_mode:
         param_grid = {'n_neighbors': [3], 'leaf_size': [5]} # optimize for speed
     if verbose:
@@ -228,7 +228,7 @@ def main(query = None, n_min = 30, n_bins = 1024, regions = 16, r_regions = 8, t
 
     # do a grid search with a random forest algorithm and k fold cross-validation to identify the best hyper parameters
     est = RandomForestClassifier()
-    param_grid = {'n_estimators': [25, 50, 75, 100], 'max_depth': [12, 15, 18, 21], 'min_samples_split': [3, 6, 9], 'min_samples_leaf': [2, 5, 8]}
+    param_grid = {'n_estimators': [25, 50, 75], 'max_depth': [15, 20, 25], 'min_samples_split': [3, 6], 'min_samples_leaf': [2, 5]}
     if test_mode:
         param_grid = {'n_estimators': [25], 'max_depth': [12], 'min_samples_split': [3], 'min_samples_leaf': [2]} # optimize for speed
     if verbose:
@@ -261,7 +261,7 @@ if __name__ == "__main__":
     # formulate query
     query = s.query(Spectra, Objects).filter(Spectra.ObjID == Objects.ObjID).filter(Objects.Redshift_Gal >= 0).filter(
           Spectra.SNID_Subtype != 'NULL').filter(Spectra.Min < 4000).filter(Spectra.Max > 7500).filter(
-          ~Spectra.SNID_Subtype.like('%,%')).filter(Spectra.SNID_Subtype.like('I%')).filter(Spectra.SNR > 25).limit(25)
+          ~Spectra.SNID_Subtype.like('%,%')).filter(Spectra.SNID_Subtype.like('I%')).filter(Spectra.SNR > 25)
 
     # execute
-    main(query = query, n_min = None)
+    main(query = query, n_min = 15)
